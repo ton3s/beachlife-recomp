@@ -12,11 +12,11 @@ targets:
     settings:
       base:
         PRODUCT_NAME: beachlife
-        PRODUCT_BUNDLE_IDENTIFIER: com.antoniocunanan.beachlife
+        PRODUCT_BUNDLE_IDENTIFIER: com.appdesign.beachlife
         INFOPLIST_FILE: Info.plist
         TARGETED_DEVICE_FAMILY: "2"
         SUPPORTED_PLATFORMS: iphoneos iphonesimulator
-        DEVELOPMENT_TEAM: QEMCH4R7C2
+        DEVELOPMENT_TEAM: PNKNRE7W69
         ARCHS: arm64
         ONLY_ACTIVE_ARCH: YES
         CODE_SIGN_STYLE: Automatic

@@ -146,6 +146,12 @@ add_library(beachlife_runtime STATIC src/runtime/runtime.cpp src/runtime/startup
     src/runtime/loading_view.cpp src/runtime/content_startup.cpp src/runtime/fps_overlay.cpp
     src/platform/video_headless.cpp
     src/platform/video_sdl_gpu.cpp)
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    target_sources(beachlife_runtime PRIVATE src/runtime/ios_orientation.mm)
+    set_source_files_properties(src/runtime/ios_orientation.mm PROPERTIES
+        LANGUAGE CXX COMPILE_OPTIONS "-xobjective-c++;-fobjc-arc")
+    target_link_libraries(beachlife_runtime PUBLIC "-framework UIKit")
+endif()
 target_include_directories(beachlife_runtime PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(beachlife_runtime PUBLIC beachlife_ui beachlife_launcher_core
     beachlife_system_usage beachlife_startup_configuration beachlife_renderer_display)

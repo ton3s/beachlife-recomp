@@ -1,0 +1,52 @@
+--- a/src/tweak_hd_buildings.cpp
++++ b/src/tweak_hd_buildings.cpp
+@@ -63,8 +63,12 @@
+         beachlife_hd_exclude(screen_manager->overlay_x_e8, screen_manager->overlay_y_ec,
+             screen_manager->overlay_right_f0, screen_manager->overlay_bottom_f4);
+     if (screen_manager->byte_15c)
+-        beachlife_hd_exclude(screen_manager->layout_x_14c, screen_manager->layout_y_150,
+-            screen_manager->layout_right_154, screen_manager->layout_bottom_158);
++    {
++        // The game keeps this panel's size the other way round: right holds its height, bottom its width.
++        const int left = screen_manager->layout_x_14c, top = screen_manager->layout_y_150;
++        beachlife_hd_exclude(left, top, left + screen_manager->layout_bottom_158 - top,
++            top + screen_manager->layout_right_154 - left);
++    }
+     for (CircularListNode* node = screen_manager->active.head->next; node != screen_manager->active.head;
+         node = node->next)
+     {
+--- a/src/startup_game_load_save.cpp
++++ b/src/startup_game_load_save.cpp
+@@ -69,6 +69,10 @@
+         controller_selection.active->ControllerSlot24();
+         screen_manager->ApplyScreenLayout();
+         screen_manager->ApplyLoadedScenario();
++        // A pause the script forced stays in the save, but the screen that went with it does not.
++        // Show the pause menu, or the player would face a frozen world with no way to resume.
++        if (window_deactivation_state->deactivation_requested)
++            screen_manager->ActivateScreens();
+     }
+     catch (const GameFileReadError& error)
+     {
+--- a/src/tweak_autosave.cpp
++++ b/src/tweak_autosave.cpp
+@@ -1,5 +1,6 @@
+ #include "startup_game_file.h"
+ #include "startup_screen_manager.h"
++#include "startup_screen_name_search.h"
+ #include "startup_screen_request.h"
+ #include "window_activation.h"
+ 
+@@ -23,6 +24,12 @@
+     const ControllerSelectionState& state = screen_request_game->controller_selection;
+     if (state.active != state.first_controller || state.pending != state.active)
+         return 0;
++    // The scenario has ended: its result screen is not saved, so a save here only strands the player.
++    CircularListIterator found;
++    CircularList& screens = screen_manager->active;
++    if (FindScreenByName(&found, screens.Begin(), screens.End(), "ScenarioLost")->node != screens.head ||
++        FindScreenByName(&found, screens.Begin(), screens.End(), "ScenarioWon")->node != screens.head)
++        return 0;
+     char temporary[128];
+     char final_path[128];
+     sprintf(temporary, "%s/autosave.tmp", startup_save_directory);

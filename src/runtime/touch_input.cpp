@@ -6,6 +6,9 @@
 #include <SDL3/SDL.h>
 #ifdef __APPLE__
 #include <TargetConditionals.h>
+#if TARGET_OS_IOS
+#include "runtime/ios_orientation.h"
+#endif
 #endif
 
 #include <cstdio>
@@ -392,6 +395,12 @@ void TouchInput::frame(unsigned long long frame_number)
         SDL_PumpEvents();
         SDL_Delay(50);
     }
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+    if (frame_number % 30 == 0)
+    {
+        keep_landscape(state_->video.window());
+    }
+#endif
     state_->current_frame = frame_number;
     if (state_->logging && frame_number % 300 == 0)
     {
