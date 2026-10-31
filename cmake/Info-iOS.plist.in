@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleExecutable</key><string>beachlife</string>
+  <key>CFBundleName</key><string>Beach Life</string>
+  <key>CFBundleDisplayName</key><string>Beach Life</string>
+  <key>CFBundleIdentifier</key><string>org.beachlife.recomp</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleVersion</key><string>@PROJECT_VERSION@</string>
+  <key>CFBundleShortVersionString</key><string>@PROJECT_VERSION@</string>
+  <key>MinimumOSVersion</key><string>@CMAKE_OSX_DEPLOYMENT_TARGET@</string>
+  <key>CFBundleSupportedPlatforms</key><array><string>iPhoneOS</string><string>iPhoneSimulator</string></array>
+  <key>UIDeviceFamily</key><array><integer>2</integer></array>
+  <key>UILaunchScreen</key><dict/>
+  <key>UIRequiresFullScreen</key><true/>
+  <key>UIStatusBarHidden</key><true/>
+  <key>UIFileSharingEnabled</key><true/>
+  <key>LSSupportsOpeningDocumentsInPlace</key><true/>
+  <key>UIApplicationSupportsIndirectInputEvents</key><true/>
+  <key>UISupportedInterfaceOrientations~ipad</key><array>
+    <string>UIInterfaceOrientationLandscapeLeft</string>
+    <string>UIInterfaceOrientationLandscapeRight</string>
+  </array>
+  <key>UISupportedInterfaceOrientations</key><array>
+    <string>UIInterfaceOrientationLandscapeLeft</string>
+    <string>UIInterfaceOrientationLandscapeRight</string>
+  </array>
+</dict></plist>

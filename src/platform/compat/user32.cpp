@@ -1,4 +1,7 @@
 #include "ansi_text.h"
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
 #include "compat_host.h"
 #include "input_map.h"
 #include "platform/video.h"
@@ -253,6 +256,20 @@ bool SDLCALL watch_event(void*, SDL_Event* event)
         if (queue_enabled && window_alive)
         {
             messages.push_back(message);
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+            if (event->type == SDL_EVENT_KEY_DOWN && text_input_enabled)
+            {
+                const SDL_Keycode typed =
+                    SDL_GetKeyFromScancode(event->key.scancode, event->key.mod, false);
+                if ((typed >= 0x20 && typed < 0x7f) || typed == 8 || typed == 13)
+                {
+                    message.message = 0x102; // WM_CHAR
+                    message.wParam = static_cast<WPARAM>(typed);
+                    message.lParam = 1;
+                    messages.push_back(message);
+                }
+            }
+#endif
         }
     }
     catch (...)
@@ -325,11 +342,15 @@ void start_text_input()
 {
     if (current_window && !text_input_enabled)
     {
+#if !(defined(TARGET_OS_IOS) && TARGET_OS_IOS)
+        // On iOS, starting text input always raises the on-screen keyboard over the
+        // game. The event watch makes typed characters from key presses instead.
         SDL_Window* target = beachlife::compat::video(current_window)->window();
         if (!SDL_StartTextInput(target))
         {
             unsupported("TranslateMessage", SDL_GetError());
         }
+#endif
         text_input_enabled = true;
     }
 }
@@ -464,6 +485,10 @@ extern "C"
         {
             return FALSE;
         }
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+        // The system owns an iOS window's size, position and stacking.
+        return TRUE;
+#endif
         // FRAMECHANGED and deferred/asynchronous positioning need another boundary.
         if (flags & ~UINT(0x07df))
         {
@@ -574,6 +599,11 @@ extern "C"
         {
             return visible;
         }
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+        // An iOS window always fills its scene; it has no restored or minimized state.
+        SDL_ShowWindow(target);
+        return visible;
+#endif
         bool ok = false;
         switch (command)
         {

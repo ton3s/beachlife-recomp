@@ -82,7 +82,8 @@ class SdlGpuVideo : public Video
 
         // The overlay's shaders come as SPIR-V, DXBC and metallib; every backend takes one of them.
         device_ = SDL_CreateGPUDevice(
-            SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXBC | SDL_GPU_SHADERFORMAT_METALLIB,
+            SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXBC | SDL_GPU_SHADERFORMAT_METALLIB |
+                SDL_GPU_SHADERFORMAT_MSL, // the iOS simulator's overlay compiles Metal source
             false,
             driver_name(settings.api));
         if (!device_)

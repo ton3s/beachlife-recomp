@@ -1,4 +1,7 @@
 #include "kernel_files.h"
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
 #include "data/game_path.h"
 #include "io.h"
 #include "native_kernel.h"
@@ -262,6 +265,28 @@ std::string logical_path(const char* path)
     return data::normalize_game_path(text).key;
 }
 
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+// The Files app shows only Documents, so saves live there and can be copied off the
+// device. Earlier builds kept them in the private folder: move those across once.
+fs::path saves_root()
+{
+    const char* home = SDL_getenv("HOME");
+    if (!home || SDL_getenv("BEACHLIFE_BOOT_USER_DIR"))
+    {
+        return user_root();
+    }
+    const auto documents = beachlife::platform::utf8_path(home) / "Documents";
+    std::error_code error;
+    const auto old_saves = user_root() / "savegames";
+    if (fs::is_directory(old_saves, error) && !fs::exists(documents / "savegames", error))
+    {
+        fs::create_directories(documents, error);
+        fs::rename(old_saves, documents / "savegames", error);
+    }
+    return documents;
+}
+#endif
+
 fs::path user_path(const char* path)
 {
     const auto logical = logical_path(path);
@@ -270,6 +295,12 @@ fs::path user_path(const char* path)
     {
         return current;
     }
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+    if (logical == "savegames" || logical.starts_with("savegames/"))
+    {
+        current = saves_root();
+    }
+#endif
     // Resolve existing components using Windows ASCII case rules. New names
     // use the normalized spelling so subsequent writes cannot fork by case.
     for (const auto& part : beachlife::platform::utf8_path(logical))
@@ -959,4 +990,10 @@ extern "C"
             },
             -1);
     }
+}
+
+// For the game's autosave: replaces one save only after its replacement is complete.
+extern "C" int beachlife_compat_replace_user_file(const char* from, const char* to)
+{
+    return host::replace_file(user_path(from), user_path(to)) ? 1 : 0;
 }

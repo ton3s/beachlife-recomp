@@ -297,7 +297,14 @@ def system_symbols(compiler='c++', nm='nm', target_system='Linux', *, arch=None,
         if not Path(runtime).is_file():
             raise ValueError(f'Cannot locate Darwin compiler runtime: {runtime}')
         paths.append(Path(runtime))
-        return symbols([nm, '-P', '--defined-only', '--extern-only', f'--arch={arch}'], paths)
+        names = symbols([nm, '-P', '--defined-only', '--extern-only', f'--arch={arch}'], paths)
+        # LLVM nm does not list simulator stubs' inlined sublibraries, so memcpy
+        # would look missing and get a trap that replaces the real one. Read the
+        # stubs' text too; a name they mention is never a game function.
+        for path in paths:
+            if path.suffix == '.tbd':
+                names.update(re.findall(r"[_A-Za-z$][\w$.]*", path.read_text(errors='replace')))
+        return names
     if target_system == 'Windows':
         # Inspect the target CRT/import libraries, never the Linux build host.
         # LLVM-MinGW uses libc++, UCRT and compiler-rt (not libstdc++/libgcc).

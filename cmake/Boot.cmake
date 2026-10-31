@@ -6,7 +6,8 @@ if(NOT BEACHLIFE_ENABLE_BOOT_GAME)
 endif()
 if(NOT (CMAKE_SIZEOF_VOID_P EQUAL 8 AND
         ((CMAKE_SYSTEM_NAME MATCHES "^(Linux|Windows)$" AND BEACHLIFE_ARCH STREQUAL "x86_64")
-         OR (CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND BEACHLIFE_ARCH MATCHES "^(arm64|x86_64)$"))))
+         OR (CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND BEACHLIFE_ARCH MATCHES "^(arm64|x86_64)$")
+         OR (CMAKE_SYSTEM_NAME STREQUAL "iOS" AND BEACHLIFE_ARCH STREQUAL "arm64"))))
     message(FATAL_ERROR "The boot build supports Linux/Windows x86-64 and macOS arm64/x86-64")
 endif()
 if(WIN32 AND NOT (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
@@ -161,17 +162,29 @@ if(APPLE)
             OUTPUT_VARIABLE beachlife_boot_sdk OUTPUT_STRIP_TRAILING_WHITESPACE
             COMMAND_ERROR_IS_FATAL ANY)
     endif()
+    set(beachlife_boot_version_flag -mmacosx-version-min)
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        set(beachlife_boot_version_flag -mios-version-min)
+        if(beachlife_boot_sdk MATCHES "[Ss]imulator")
+            set(beachlife_boot_version_flag -mios-simulator-version-min)
+        endif()
+    endif()
     list(APPEND beachlife_boot_inspection
         --target-arch "${BEACHLIFE_ARCH}" --sysroot "${beachlife_boot_sdk}"
         --objdump "${BEACHLIFE_BOOT_OBJDUMP}"
         --compiler-arg=-arch "--compiler-arg=${BEACHLIFE_ARCH}"
         --compiler-arg=-isysroot "--compiler-arg=${beachlife_boot_sdk}"
-        "--compiler-arg=-mmacosx-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+        "--compiler-arg=${beachlife_boot_version_flag}=${CMAKE_OSX_DEPLOYMENT_TARGET}")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     list(APPEND beachlife_boot_inspection --readelf "${CMAKE_READELF}")
 endif()
 if(CMAKE_CXX_COMPILER_TARGET)
     list(APPEND beachlife_boot_inspection "--compiler-arg=--target=${CMAKE_CXX_COMPILER_TARGET}")
+endif()
+set(beachlife_boot_target_system "${CMAKE_SYSTEM_NAME}")
+if(beachlife_boot_target_system STREQUAL "iOS")
+    # Same Mach-O format and symbol rules as macOS, read from the iOS SDK.
+    set(beachlife_boot_target_system Darwin)
 endif()
 set(beachlife_boot_complete "$<$<CONFIG:Release>:--require-complete>")
 if(BEACHLIFE_BUILD_CHANNEL STREQUAL "release" OR BEACHLIFE_BUILD_CHANNEL STREQUAL "test")
@@ -182,7 +195,7 @@ add_custom_command(
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/game_tree.py" traps
         --objects "${beachlife_boot_dir}/objects.txt" ${beachlife_boot_inventory} ${beachlife_boot_complete}
         --compiler "${CMAKE_CXX_COMPILER}" --nm "${beachlife_boot_nm}" ${beachlife_boot_inspection}
-        --demangler "${beachlife_demangler}" --target-system "${CMAKE_SYSTEM_NAME}"
+        --demangler "${beachlife_demangler}" --target-system "${beachlife_boot_target_system}"
         --host $<TARGET_FILE:beachlife_compat> $<TARGET_FILE:beachlife_resource_pool_host>
         --tree "${BEACHLIFE_DECOMP_PREPARED}/beachlife-decomp"
         --output "${beachlife_boot_dir}/traps.cpp" --json "${beachlife_boot_dir}/traps.json"

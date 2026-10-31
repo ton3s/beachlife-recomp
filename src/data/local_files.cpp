@@ -1,4 +1,7 @@
 #include "local_files.h"
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
 #include "game_path.h"
 #include "platform/path.h"
 
@@ -237,8 +240,17 @@ std::unique_ptr<SourceFile> open_local_file(
     }
     auto file = open_windows(full, false);
 #else
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+    // The iOS sandbox denies opening the folders above the app's container, so the
+    // walk starts at the content root, which canonical_content_root already checked.
+    parents.emplace_back(::open(std::filesystem::absolute(root).lexically_normal().c_str(),
+        O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC));
+    const auto below_root = platform::utf8_path(logical.display).parent_path();
+#else
     parents.emplace_back(::open(full.root_path().c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC));
-    for (const auto& part : full.relative_path().parent_path())
+    const auto below_root = full.relative_path().parent_path();
+#endif
+    for (const auto& part : below_root)
     {
         parents.emplace_back(openat(
             parents.back().value, part.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC));

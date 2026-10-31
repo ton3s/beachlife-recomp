@@ -1,0 +1,92 @@
+diff --git a/src/window_camera_update.cpp b/src/window_camera_update.cpp
+--- a/src/window_camera_update.cpp
++++ b/src/window_camera_update.cpp
+@@ -6,6 +6,8 @@
+ #include "startup_screen_placement.h"
+ #include "startup_screen_renderer.h"
+ #include "startup_variable_state.h"
++
++extern "C" int beachlife_touch_mode(void);
+ 
+ // FUNCTION: BEACHLIFE 0x0043d540
+ void WindowDeactivationState::UpdateAt0043d540()
+@@ -35,7 +37,8 @@
+     if (moved)
+         screen_manager->word_98 = -1;
+ 
+-    if (screen_request_game->placement->flag_34)
++    // Touch: a finger lifted at the screen edge must not leave the map scrolling.
++    if (screen_request_game->placement->flag_34 && !beachlife_touch_mode())
+     {
+         distance = startup_frame_clock->delta_seconds * 150.0f;
+         if (motion_04->value_134 == 0)
+diff --git a/src/tweak_touch.cpp b/src/tweak_touch.cpp
+new file mode 100644
+--- /dev/null
++++ b/src/tweak_touch.cpp
+@@ -0,0 +1,65 @@
++#include "startup_input_motion.h"
++#include "startup_screen_manager.h"
++#include "startup_screen_overlay_layout.h"
++#include "startup_screen_renderer.h"
++#include "window_activation.h"
++
++// Touch support, not in the original game: what the finger gestures need to know
++// about the world and how they move it (src/runtime/touch_input.cpp).
++// 0: hold the button. 1: pan the map. 2: move the cursor only.
++static int drag_under_cursor()
++{
++    if (!screen_manager || !window_deactivation_state || !overlay_map)
++        return 0;
++    if (screen_manager->IsPointerOverScreen(1) ||
++        !startup_input_motion_state->ContainsRectangle(overlay_map->view_ac))
++        return 0;
++    switch (screen_manager->mode)
++    {
++    case 4: // the plain world view
++        return 1;
++    case 1:  // scenery
++    case 5:  // buildings
++    case 9:  // staff assignment
++    case 10: // bulldozer
++        // A press acts at once in these, so a drag must not press. Paths (7, 8) paint
++        // while held, so they keep the button.
++        return 2;
++    default:
++        return 0;
++    }
++}
++
++// Game pixels to world units at the current zoom, so the map stays under the finger.
++static float world_per_pixel()
++{
++    const unsigned int mode = screen_request_renderer->clip_mode_54;
++    return mode == 0 ? 0.5f : mode == 2 ? 2.0f : 1.0f;
++}
++
++static bool world_ready()
++{
++    return screen_manager && window_deactivation_state && overlay_map && screen_manager->mode != 6 &&
++           !overlay_map->flag_130;
++}
++
++// ScrollView is a velocity that decays by half each frame, so a drag moves the view directly.
++static void pan(float x, float y)
++{
++    if (world_ready())
++    {
++        overlay_map->view_x_e4 += x * world_per_pixel();
++        overlay_map->view_y_e8 += y * world_per_pixel();
++    }
++}
++
++// On lift-off the same velocity gives the game's own short glide.
++static void fling(float x, float y)
++{
++    if (world_ready())
++        overlay_map->ScrollView(x * world_per_pixel(), y * world_per_pixel());
++}
++
++extern "C" void beachlife_touch_register(
++    int (*)(void), void (*)(float, float), void (*)(float, float));
++static const int touch_registered = (beachlife_touch_register(drag_under_cursor, pan, fling), 0);

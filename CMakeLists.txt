@@ -45,6 +45,8 @@ endif()
 
 if(WIN32)
     set(BEACHLIFE_SYSTEM windows)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(BEACHLIFE_SYSTEM ios)
 elseif(APPLE)
     set(BEACHLIFE_SYSTEM macos)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -136,6 +138,10 @@ if(APPLE)
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Info.plist.in"
         OUTPUT_NAME beachlife)
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        set_target_properties(beachlife PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Info-iOS.plist.in")
+    endif()
 endif()
 
 include(cmake/Launcher.cmake)

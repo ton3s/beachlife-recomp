@@ -142,6 +142,7 @@ add_dependencies(beachlife_launcher build_identity)
 
 # Play's game window and caller-thread startup, shared with the generated fixture.
 add_library(beachlife_runtime STATIC src/runtime/runtime.cpp src/runtime/startup.cpp
+    src/runtime/touch_gestures.cpp src/runtime/touch_input.cpp
     src/runtime/loading_view.cpp src/runtime/content_startup.cpp src/runtime/fps_overlay.cpp
     src/platform/video_headless.cpp
     src/platform/video_sdl_gpu.cpp)
@@ -161,11 +162,16 @@ target_link_libraries(beachlife PRIVATE beachlife_launcher beachlife_runtime)
 
 # The fixture receives this explicit path because it is not a macOS app bundle.
 set(BEACHLIFE_RESOURCE_DIR "$<TARGET_FILE_DIR:beachlife>/assets/launcher")
-if(APPLE)
+if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(BEACHLIFE_RESOURCE_DIR "$<TARGET_FILE_DIR:beachlife>/../Resources/assets/launcher")
 endif()
 
 if(BUILD_TESTING)
+    add_executable(touch_gestures_tests tests/touch_gestures.cpp src/runtime/touch_gestures.cpp)
+    target_include_directories(touch_gestures_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+    target_compile_features(touch_gestures_tests PRIVATE cxx_std_20)
+    add_test(NAME touch_gestures COMMAND touch_gestures_tests)
+
     add_executable(renderer_word_surface_tests tests/renderer_word_surface.cpp)
     target_link_libraries(renderer_word_surface_tests PRIVATE beachlife_renderer_words)
     set_target_properties(renderer_word_surface_tests PROPERTIES CXX_EXTENSIONS OFF)

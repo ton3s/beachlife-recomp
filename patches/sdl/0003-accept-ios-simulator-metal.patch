@@ -1,0 +1,12 @@
+diff --git a/src/gpu/metal/SDL_gpu_metal.m b/src/gpu/metal/SDL_gpu_metal.m
+--- a/src/gpu/metal/SDL_gpu_metal.m
++++ b/src/gpu/metal/SDL_gpu_metal.m
+@@ -4559,7 +4559,7 @@ static void METAL_INTERNAL_DestroyBlitResources(
+                 [device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v4] :
+                 [device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1];
+         }
+-#elif defined(SDL_PLATFORM_VISIONOS)
++#elif defined(SDL_PLATFORM_VISIONOS) || TARGET_OS_SIMULATOR
+         hasHardwareSupport = true;
+ #else
+         if (@available(iOS 13.0, tvOS 13.0, *)) {

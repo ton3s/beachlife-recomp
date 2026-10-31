@@ -1,2 +1,3 @@
 0001-guard-empty-display-modes.patch
 0002-retain-xlib-process-cache.patch
+0003-accept-ios-simulator-metal.patch

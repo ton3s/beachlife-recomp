@@ -1,0 +1,105 @@
+diff --git a/src/startup_game_save.cpp b/src/startup_game_save.cpp
+--- a/src/startup_game_save.cpp
++++ b/src/startup_game_save.cpp
+@@ -9,6 +9,33 @@
+ #include <bit>
+ #include <stdio.h>
+ #include <time.h>
++
++// Touch autosave: the original SaveGame body, shared so an autosave writes the same file.
++void WriteGameSave(ScreenRequestGamePrefix* game, const char* path)
++{
++    GameFileReader* file = new GameFileReader(1, path);
++    file->Unknown3c(startup_save_signature);
++    file->Unknown30("Version", std::bit_cast<unsigned int>(startup_save_version));
++    time_t timestamp;
++    time(&timestamp);
++    file->Unknown28("Save time", static_cast<unsigned int>(timestamp));
++    file->Unknown28("Scenario number", game->scenario_a0);
++    file->Unknown28("GetGameDay", window_deactivation_state->day_15c);
++    file->Unknown30("GetGameDayTime", std::bit_cast<unsigned int>(window_deactivation_state->render_value_160));
++    file->Unknown30("PlayerCash", std::bit_cast<unsigned int>(window_deactivation_state->economy_1c->value_80));
++    file->Unknown28("NumGuests", window_deactivation_state->guests_43c);
++    char title[128];
++    if (game->byte_a4)
++    {
++        sprintf(title, "MAINSS_SANDBOX%d_TITLE", game->scenario_a0 + 1);
++        file->Unknown38("ScenarioTitle", title);
++    }
++    else
++        file->Unknown38("ScenarioTitle", window_deactivation_state->scenario_title_73c);
++    file->Unknown34("SandBoxMode", game->byte_a4);
++    window_deactivation_state->SaveState(file);
++    delete file;
++}
+ 
+ // FUNCTION: BEACHLIFE 0x004e4250
+ void ScreenRequestGamePrefix::SaveGame()
+@@ -33,26 +60,5 @@
+ 
+     char path[128];
+     sprintf(path, "%s/save%d.dat", startup_save_directory, number);
+-    GameFileReader* file = new GameFileReader(1, path);
+-    file->Unknown3c(startup_save_signature);
+-    file->Unknown30("Version", std::bit_cast<unsigned int>(startup_save_version));
+-    time_t timestamp;
+-    time(&timestamp);
+-    file->Unknown28("Save time", static_cast<unsigned int>(timestamp));
+-    file->Unknown28("Scenario number", scenario_a0);
+-    file->Unknown28("GetGameDay", window_deactivation_state->day_15c);
+-    file->Unknown30("GetGameDayTime", std::bit_cast<unsigned int>(window_deactivation_state->render_value_160));
+-    file->Unknown30("PlayerCash", std::bit_cast<unsigned int>(window_deactivation_state->economy_1c->value_80));
+-    file->Unknown28("NumGuests", window_deactivation_state->guests_43c);
+-    char title[128];
+-    if (byte_a4)
+-    {
+-        sprintf(title, "MAINSS_SANDBOX%d_TITLE", scenario_a0 + 1);
+-        file->Unknown38("ScenarioTitle", title);
+-    }
+-    else
+-        file->Unknown38("ScenarioTitle", window_deactivation_state->scenario_title_73c);
+-    file->Unknown34("SandBoxMode", byte_a4);
+-    window_deactivation_state->SaveState(file);
+-    delete file;
++    WriteGameSave(this, path);
+ }
+diff --git a/src/tweak_autosave.cpp b/src/tweak_autosave.cpp
+new file mode 100644
+--- /dev/null
++++ b/src/tweak_autosave.cpp
+@@ -0,0 +1,35 @@
++#include "startup_game_file.h"
++#include "startup_screen_manager.h"
++#include "startup_screen_request.h"
++#include "window_activation.h"
++
++#include <stdio.h>
++
++// Touch support, not in the original game: iOS can close a backgrounded app without
++// warning, so the host asks for this save. It has its own slot, shown in the load list,
++// and only replaces the previous autosave once the new one is completely written.
++void WriteGameSave(ScreenRequestGamePrefix* game, const char* path);
++extern "C" int beachlife_compat_replace_user_file(const char* from, const char* to);
++
++static const int autosave_slot = 9999;
++
++static int autosave()
++{
++    // Mode 4 is the plain world view, where the player's own Save button works.
++    if (!screen_manager || !window_deactivation_state || !screen_request_game ||
++        screen_manager->mode != 4)
++        return 0;
++    // The world must be running, with no change to another game state on its way.
++    const ControllerSelectionState& state = screen_request_game->controller_selection;
++    if (state.active != state.first_controller || state.pending != state.active)
++        return 0;
++    char temporary[128];
++    char final_path[128];
++    sprintf(temporary, "%s/autosave.tmp", startup_save_directory);
++    sprintf(final_path, "%s/save%d.dat", startup_save_directory, autosave_slot);
++    WriteGameSave(screen_request_game, temporary);
++    return beachlife_compat_replace_user_file(temporary, final_path);
++}
++
++extern "C" void beachlife_touch_register_autosave(int (*)(void));
++static const int autosave_registered = (beachlife_touch_register_autosave(autosave), 0);

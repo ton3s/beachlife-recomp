@@ -6,7 +6,7 @@ if(WIN32)
     target_sources(beachlife PRIVATE "${CMAKE_BINARY_DIR}/generated/app.rc")
     set_property(SOURCE "${CMAKE_BINARY_DIR}/generated/app.rc" PROPERTY OBJECT_DEPENDS
         "${CMAKE_SOURCE_DIR}/assets/app/icon.ico")
-elseif(APPLE)
+elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     find_program(BEACHLIFE_SIPS sips REQUIRED)
     find_program(BEACHLIFE_ICONUTIL iconutil REQUIRED)
     set(BEACHLIFE_ICNS "${CMAKE_BINARY_DIR}/generated/beachlife.icns")

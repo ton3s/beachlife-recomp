@@ -1,4 +1,5 @@
 #include "runtime/runtime.h"
+#include "runtime/touch_input.h"
 #include "data/content_manifest.h"
 #include "platform/app_icon.h"
 #include "platform/path.h"
@@ -163,6 +164,7 @@ struct GamePumpState
         std::mt19937 random;
         std::uint64_t interval = 90, next = 0;
     } monkey;
+    std::unique_ptr<TouchInput> touch = nullptr;
 };
 
 GamePumpState::Monkey scripted_monkey()
@@ -478,6 +480,10 @@ void prepare_game_frame(void* context)
 {
     auto& state = *static_cast<GamePumpState*>(context);
     ++state.frames;
+    if (state.touch)
+    {
+        state.touch->frame(state.frames);
+    }
     advance_route(state);
     advance_monkey(state);
     for (const auto& scripted : state.keys)
@@ -860,8 +866,13 @@ int run_game(const Options& options, detail::ConfigurationFactory configuration)
             scripted_monkey()};
         GameHost host{
             video, prepare_game_frame, &pump, game_source, options.hidden || options.headless};
-        wheel_zoom_tweak =
-            settings.tweaks.wheel_zoom || SDL_getenv("BEACHLIFE_TWEAK_WHEEL_ZOOM") != nullptr;
+        // Pinching zooms through the wheel, so fingers always need it.
+        wheel_zoom_tweak = settings.tweaks.wheel_zoom || TouchInput::wanted() ||
+                           SDL_getenv("BEACHLIFE_TWEAK_WHEEL_ZOOM") != nullptr;
+        if (TouchInput::wanted())
+        {
+            pump.touch = std::make_unique<TouchInput>(video);
+        }
         skip_intro_tweak =
             settings.tweaks.skip_intro || SDL_getenv("BEACHLIFE_TWEAK_SKIP_INTRO") != nullptr;
         retail_files::set_open_observer(game_file_opened, &pump);

@@ -16,3 +16,7 @@ Repeated SDL initialization reuses the retained handle. Optional X11 extension
 modules still unload, and SDL still closes input methods, displays and windows
 and resets its function pointers and module flags. This is qualified for the
 statically linked SDL used by the application; unloading SDL itself is separate.
+
+`0003-accept-ios-simulator-metal.patch` skips the GPU family check on the iOS
+simulator, whose Metal device does not report `MTLGPUFamilyApple3`. Real devices
+keep the check. It has no effect on other platforms.

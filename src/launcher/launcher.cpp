@@ -1,4 +1,7 @@
 #include "launcher.h"
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
 #include "build_version.h"
 #include "content_service.h"
 #include "image.h"
@@ -418,10 +421,13 @@ class Launcher
                 throw std::runtime_error("Unknown update preview state.");
             }
         }
+#if !(defined(TARGET_OS_IOS) && TARGET_OS_IOS)
+        // The updater replaces a desktop package in place, which an iOS app cannot do.
         else if (settings_.updates.check && !offline)
         {
             check_updates(UpdatePrompt::Newer, update_channel());
         }
+#endif
         ramp_ = create_ramp(renderer_);
         spot_ = create_spot(renderer_);
         require(ramp_ && spot_, "Cannot create the launcher shading");

@@ -9,8 +9,17 @@
 #endif
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
 
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <string>
 #include <ctime>
 #include <iostream>
 #include <optional>
@@ -18,8 +27,63 @@
 #include <string_view>
 #include <utility>
 
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+namespace
+{
+// iOS has no file dialog for the launcher, so the app goes straight to the game. Prepared
+// files need nothing else. Otherwise the ISO comes from the Files app (or, in the simulator,
+// from the Xcode scheme, since a simulator app can read the Mac's files).
+bool ios_choose_game_files(beachlife::launcher::Options& options)
+{
+    namespace fs = std::filesystem;
+    if (const char* pref = SDL_GetPrefPath("BeachLife", "BeachLife"))
+    {
+        std::ifstream settings(fs::path(pref) / "launcher.cfg");
+        SDL_free(const_cast<char*>(pref));
+        for (std::string line; std::getline(settings, line);)
+        {
+            if (line.starts_with("content.identity \"") && line != "content.identity \"\"")
+            {
+                return true;
+            }
+        }
+    }
+    if (const char* iso = SDL_getenv("BEACHLIFE_IOS_ISO"); iso && *iso)
+    {
+        options.source = iso;
+        return true;
+    }
+    std::error_code error;
+    const char* home = SDL_getenv("HOME");
+    const fs::path documents = fs::path(home ? home : "") / "Documents";
+    for (const auto& entry : fs::directory_iterator(documents, error))
+    {
+        auto extension = entry.path().extension().string();
+        std::transform(extension.begin(), extension.end(), extension.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (extension == ".iso")
+        {
+            options.source = entry.path().string();
+            return true;
+        }
+    }
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Beach Life needs your game files",
+        "Copy your Beach Life ISO into the Beach Life folder: Files app > On My iPad > "
+        "Beach Life. Then open the game again.",
+        nullptr);
+    return false;
+}
+} // namespace
+#endif
+
 int main(int argc, char** argv)
 {
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+    // The game reads keys through DirectInput-style state, so text input must not
+    // bring up the on-screen keyboard over the playfield.
+    SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
+#endif
 #if BEACHLIFE_BOOT_GAME
     // Play runs the decompiled game; missing code stops it at a trap.
     beachlife::runtime::set_game_entry(beachlife::runtime::run_boot_game);
@@ -79,6 +143,16 @@ int main(int argc, char** argv)
     options.argc = argc;
     options.argv = argv;
     bool play = false;
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+    if (argc == 1)
+    {
+        if (!ios_choose_game_files(options))
+        {
+            return 0;
+        }
+        play = true;
+    }
+#endif
     std::string preview_screen;
     int frames = 0;
     bool headless = false;
@@ -235,7 +309,14 @@ int main(int argc, char** argv)
         const auto result = beachlife::runtime::run(game);
         if (play)
         {
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+            // Returning from main leaves an iOS app alive with an empty window, so the
+            // game's Exit button would appear to hang. Run static cleanup and quit instead.
+            log.reset();
+            std::exit(result);
+#else
             return result;
+#endif
         }
         options.source.clear(); // the launcher shows the saved choice from now on
         options.page = outcome.prepare_only || !outcome.preview_screen.empty()
