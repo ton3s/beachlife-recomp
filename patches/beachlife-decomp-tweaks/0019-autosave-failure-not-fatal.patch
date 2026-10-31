@@ -1,0 +1,33 @@
+--- a/src/tweak_autosave.cpp
++++ b/src/tweak_autosave.cpp
+@@ -4,7 +4,10 @@
+ #include "startup_screen_request.h"
+ #include "window_activation.h"
+ 
++#include <errno.h>
++#include <exception>
+ #include <stdio.h>
++#include <string.h>
+ 
+ // Touch support, not in the original game: iOS can close a backgrounded app without
+ // warning, so the host asks for this save. It has its own slot, shown in the load list,
+@@ -34,7 +37,18 @@
+     char final_path[128];
+     sprintf(temporary, "%s/autosave.tmp", startup_save_directory);
+     sprintf(final_path, "%s/save%d.dat", startup_save_directory, autosave_slot);
+-    WriteGameSave(screen_request_game, temporary);
++    // A failed autosave must never end the game: the player can still save by hand.
++    errno = 0;
++    try
++    {
++        WriteGameSave(screen_request_game, temporary);
++    }
++    catch (const std::exception& error)
++    {
++        fprintf(stderr, "Autosave failed: %s (%s)\n", error.what(), strerror(errno));
++        fflush(stderr);
++        return 0;
++    }
+     return beachlife_compat_replace_user_file(temporary, final_path);
+ }
+ 

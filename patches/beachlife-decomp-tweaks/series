@@ -17,3 +17,4 @@
 0016-touch-stops-following.patch
 0017-waterfall-effect.patch
 0018-load-pause-menu-and-panel-rect.patch
+0019-autosave-failure-not-fatal.patch

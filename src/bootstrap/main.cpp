@@ -76,10 +76,59 @@ bool ios_choose_game_files(beachlife::launcher::Options& options)
 } // namespace
 #endif
 
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+namespace
+{
+// A save folder made by a tool outside the app, such as devicectl, can be read but not written,
+// so every save fails. The app owns Documents, so it can replace the folder with one of its own.
+void repair_save_folder()
+{
+    namespace fs = std::filesystem;
+    const char* home = SDL_getenv("HOME");
+    if (!home)
+    {
+        return;
+    }
+    const fs::path folder = fs::path(home) / "Documents" / "savegames";
+    std::error_code error;
+    if (!fs::is_directory(folder, error))
+    {
+        return;
+    }
+    const fs::path probe = folder / ".write-test";
+    if (std::FILE* file = std::fopen(probe.c_str(), "wb"))
+    {
+        std::fclose(file);
+        fs::remove(probe, error);
+        return;
+    }
+    const fs::path old = folder.parent_path() / "savegames.unwritable";
+    fs::remove_all(old, error);
+    fs::rename(folder, old, error);
+    if (error)
+    {
+        std::fprintf(stderr, "Save folder: cannot replace it: %s\n", error.message().c_str());
+        return;
+    }
+    fs::create_directory(folder, error);
+    fs::copy(old, folder, fs::copy_options::recursive, error);
+    if (error)
+    {
+        // Keep the original beside it: the saves are still there.
+        std::fprintf(stderr, "Save folder: saves left in %s: %s\n", old.c_str(), error.message().c_str());
+        return;
+    }
+    fs::remove_all(old, error);
+    std::fprintf(stderr, "Save folder: replaced with a writable one.\n");
+}
+} // namespace
+#endif
+
 int main(int argc, char** argv)
 {
 #if defined(TARGET_OS_IOS) && TARGET_OS_IOS
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+    repair_save_folder();
     // The game reads keys through DirectInput-style state, so text input must not
     // bring up the on-screen keyboard over the playfield.
     SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
