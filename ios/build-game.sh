@@ -40,6 +40,11 @@ if [ -n "${TARGET_BUILD_DIR:-}" ]; then
     cp -f "$build/beachlife.app/beachlife" "$app/$EXECUTABLE_NAME"
     rm -rf "$app/assets"
     cp -R "$build/beachlife.app/assets" "$app/assets"
+    # HD art made by tools/hd_buildings.py from your own game files. Never committed.
+    rm -rf "$app/hd"
+    if [ -d "$root/build/hd_assets" ]; then
+        cp -R "$root/build/hd_assets" "$app/hd"
+    fi
     if [ -n "$entitlements" ]; then
         # Simulator builds have no entitlements, and codesign refuses an empty file.
         if [ -s "$entitlements" ]; then

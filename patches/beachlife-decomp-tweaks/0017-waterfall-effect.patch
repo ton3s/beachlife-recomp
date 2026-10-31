@@ -1,0 +1,24 @@
+--- a/src/tweak_hd_buildings.cpp
++++ b/src/tweak_hd_buildings.cpp
+@@ -1,3 +1,4 @@
++#include "startup_screen_request.h"
+ #include "startup_config_owner.h"
+ #include "startup_building_status.h"
+ #include <stdio.h>
+@@ -18,6 +19,7 @@
+ extern "C" void beachlife_hd_exclude(int left, int top, int right, int bottom);
+ extern "C" void beachlife_hd_world(int origin_x, int origin_y, float scale, float hour, int lighting);
+ extern "C" void beachlife_hd_person(int x, int y, float scale);
++extern "C" void beachlife_hd_waterfall(int present);
+ 
+ // Game pixels per sprite pixel: the near zoom doubles a half-size world, the far one halves sprites.
+ static float world_scale()
+@@ -81,6 +83,8 @@
+         bool lighting = false;
+         startup_config_owner->GetBool(&lighting, "bNIGHT_DAY_ENABLED");
+         beachlife_hd_world(view.x, view.y, scale, window_deactivation_state->render_value_160, lighting);
++        // Only the first scenario's island has a waterfall painted into its terrain.
++        beachlife_hd_waterfall(screen_request_game && screen_request_game->scenario_a0 == 0 && !screen_request_game->byte_a4);
+     }
+     for (unsigned int i = 0; i < variable_world->buildings_04; ++i)
+     {

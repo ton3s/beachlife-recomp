@@ -102,6 +102,17 @@ inline SDL_Rect frame_rect(
     return {(window_width - width) / 2, (window_height - height) / 2, width, height};
 }
 
+// Text the game asked for this frame, drawn sharply by the host in game coordinates.
+struct HdGlyph
+{
+    unsigned int codepoint;
+    int x, y, width, height;
+    unsigned char red, green, blue;
+    int clip_left, clip_top, clip_right, clip_bottom;
+};
+const std::vector<HdGlyph>& hd_glyphs();
+void set_hd_text(bool enabled);
+
 class Video
 {
   public:

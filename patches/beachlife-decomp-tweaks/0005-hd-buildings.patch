@@ -1,0 +1,80 @@
+diff --git a/src/startup_game_render.cpp b/src/startup_game_render.cpp
+--- a/src/startup_game_render.cpp
++++ b/src/startup_game_render.cpp
+@@ -2,6 +2,8 @@
+ #include "startup_config_owner.h"
+ #include "startup_screen_renderer.h"
+ #include "window_activation.h"
++
++void beachlife_hd_collect();
+ 
+ // FUNCTION: BEACHLIFE 0x004e3a50
+ void ScreenRequestGamePrefix::Render()
+@@ -35,5 +37,6 @@
+     renderer->RestoreSurfaces();
+     controller_selection.active->RenderAfterScreens();
+     screens->RenderPointer();
++    beachlife_hd_collect();
+     renderer->Present();
+ }
+diff --git a/src/tweak_hd_buildings.cpp b/src/tweak_hd_buildings.cpp
+new file mode 100644
+--- /dev/null
++++ b/src/tweak_hd_buildings.cpp
+@@ -0,0 +1,56 @@
++#include "startup_building_status.h"
++#include "startup_pointer_list_operations.h"
++#include "startup_screen_dialog.h"
++#include "startup_screen_dialog_resource.h"
++#include "startup_screen_manager.h"
++#include "startup_screen_overlay_layout.h"
++#include "startup_screen_renderer.h"
++#include "startup_variable_state.h"
++#include "window_activation.h"
++
++// HD art, not in the original game. Buildings are burned once into the cached terrain, so
++// there is no draw call to replace. Instead, tell the host where each one is in this frame.
++// It draws the HD version wherever the frame still shows the original sprite, so anything
++// in front, the interface and lighting all keep working.
++extern "C" void beachlife_hd_begin(void);
++extern "C" void beachlife_hd_add(const char* name, unsigned int direction, int x, int y);
++extern "C" void beachlife_hd_exclude(int left, int top, int right, int bottom);
++
++void beachlife_hd_collect()
++{
++    beachlife_hd_begin();
++    // Normal zoom only for now: the other zooms draw resampled sprites.
++    if (!window_deactivation_state || !screen_manager || !overlay_map || !variable_world ||
++        screen_manager->mode == 6 || screen_request_renderer->clip_mode_54 != 1)
++        return;
++    // Interface pixels can look like a sprite's (white on white), so name them outright.
++    beachlife_hd_exclude(0, overlay_map->view_ac.bottom, screen_request_renderer->width,
++        screen_request_renderer->height);
++    for (CircularListNode* node = screen_manager->active.head->next; node != screen_manager->active.head;
++        node = node->next)
++    {
++        ActiveScreenEntry* entry = static_cast<CircularListValueNode*>(node)->entry;
++        if (entry->state == 1 && entry->item)
++        {
++            const ScreenRectangle& area = entry->item->rectangle;
++            beachlife_hd_exclude(area.left, area.top, area.right, area.bottom);
++        }
++    }
++    for (unsigned int i = 0; i < variable_world->buildings_04; ++i)
++    {
++        VariableEntity* entity = variable_world->buildings_12120[i];
++        if (!entity || !entity->keyline_state_44)
++            continue;
++        const float building = window_deactivation_state->building_status_48->ValueAt004224a0(entity->id_28);
++        if (building < 0.0f || building > 0.0f)
++            continue; // under construction
++        ScreenDialogResource* image = entity->keyline_state_44;
++        if (!image->record || image->record->format_18 != 5 || image->word_10 != 0)
++            continue;
++        ScreenWorldPosition position = { entity->x_30, entity->y_34, entity->z_38 };
++        ScreenPoint screen = overlay_map->WorldToScreen(position);
++        screen.x += image->CurrentFrameValue();
++        screen.y += image->SelectedFrame()->word_14;
++        beachlife_hd_add(image->record->name, image->word_18, screen.x, screen.y);
++    }
++}

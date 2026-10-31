@@ -1,0 +1,32 @@
+--- a/src/startup_screen_mode4_virtuals.cpp
++++ b/src/startup_screen_mode4_virtuals.cpp
+@@ -6,6 +6,8 @@
+ #include "startup_screen_overlay_layout.h"
+ #include "startup_screen_renderer.h"
+ #include "startup_variable_state.h"
++
++extern "C" int beachlife_touch_mode(void);
+ 
+ // SYNTHETIC: BEACHLIFE 0x004a8630
+ // ScreenMode4Controller::`scalar deleting destructor'
+@@ -96,6 +98,9 @@
+     point.y += overlay_map->scroll_y_c8;
+     if (second_buttons == 1 && !manager->IsPointerOverCurrentScreen())
+         manager->word_98 = -1;
++    // Touch has no easy right click: tapping the world stops following too.
++    if (buttons == 1 && beachlife_touch_mode() && !manager->IsPointerOverScreen(1))
++        manager->word_98 = -1;
+     if (buttons == 1)
+     {
+         if (!manager->IsPointerOverScreen(1) && !SelectAtPointer())
+--- a/src/tweak_touch.cpp
++++ b/src/tweak_touch.cpp
+@@ -48,6 +48,8 @@
+ {
+     if (world_ready())
+     {
++        // Moving the map by hand stops following a worker, as the arrow keys do.
++        screen_manager->word_98 = -1;
+         overlay_map->view_x_e4 += x * world_per_pixel();
+         overlay_map->view_y_e8 += y * world_per_pixel();
+     }

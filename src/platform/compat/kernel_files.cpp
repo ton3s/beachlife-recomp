@@ -21,6 +21,7 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <string_view>
 #include <system_error>
 
 namespace beachlife::compat::kernel
@@ -220,8 +221,15 @@ fs::path user_root()
     // player's options, progress or saves.
     if (const char* override = SDL_getenv("BEACHLIFE_BOOT_USER_DIR"))
     {
-        fs::create_directories(beachlife::platform::utf8_path(override));
-        return fs::weakly_canonical(beachlife::platform::utf8_path(override));
+        // "~/" names the home folder: on iOS its absolute path changes with each install.
+        auto folder = beachlife::platform::utf8_path(override);
+        const char* home = SDL_getenv("HOME");
+        if (home && std::string_view(override).starts_with("~/"))
+        {
+            folder = beachlife::platform::utf8_path(home) / (override + 2);
+        }
+        fs::create_directories(folder);
+        return fs::weakly_canonical(folder);
     }
     std::unique_ptr<char, decltype(&SDL_free)> path(
         SDL_GetPrefPath("BeachLife", "BeachLife"), SDL_free);

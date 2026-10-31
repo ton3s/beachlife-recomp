@@ -1,0 +1,64 @@
+--- a/src/startup_font_draw_text.cpp	2026-10-31 08:10:52
++++ b/src/startup_font_draw_text.cpp	2026-10-31 08:10:52
+@@ -23,6 +23,10 @@
+         return;
+     }
+ 
++    // A little more space between wrapped lines. The fit check keeps the original spacing,
++    // so no line that used to show gets dropped.
++    int extra_leading = 0;
++
+     unsigned short scratch[256];
+     while (*cursor != 0 && !stopped)
+     {
+@@ -64,7 +68,8 @@
+             memset(scratch, 0, sizeof(scratch));
+             unsigned int copy_bytes = (line_characters - word_characters) * 2;
+             memcpy(scratch, line_start, copy_bytes);
+-            DrawTextLine(x, y, scratch);
++            DrawTextLine(x, y + extra_leading, scratch);
++            ++extra_leading;
+ 
+             height = data_1c->unknown_10804[0];
+             adjustment = static_cast<int>(height * -1.2f);
+@@ -84,5 +89,5 @@
+         }
+     }
+     if (!stopped)
+-        DrawTextLine(x, y, line_start);
++        DrawTextLine(x, y + extra_leading, line_start);
+ }
+--- a/src/startup_screen_render_pointer.cpp	2026-10-31 08:10:52
++++ b/src/startup_screen_render_pointer.cpp	2026-10-31 08:10:52
+@@ -1,3 +1,4 @@
++extern "C" void beachlife_hd_cover(int left, int top, int right, int bottom);
+ #include "startup_active_screen.h"
+ #include "startup_input_motion.h"
+ #include "startup_input_state.h"
+@@ -99,6 +100,8 @@
+                 source.right = bounds.right - bounds.left;
+                 source.bottom = bounds.bottom - bounds.top;
+                 ClipScreenRectangles(&bounds, &source);
++                // The dialog hides sharp text beneath it; its own live text is drawn next.
++                beachlife_hd_cover(bounds.left, bounds.top, bounds.right, bounds.bottom);
+                 renderer->BlitSurfaceRegion(bounds, source, entry->surface);
+                 word_94 = entry->context;
+                 item->Unresolved1c();
+--- a/src/tweak_hd_buildings.cpp	2026-10-31 08:10:52
++++ b/src/tweak_hd_buildings.cpp	2026-10-31 08:10:52
+@@ -15,7 +15,6 @@
+ // in front, the interface and lighting all keep working.
+ extern "C" void beachlife_hd_add(const char* key, int x, int y, int width, int height, float scale, int kind);
+ extern "C" void beachlife_hd_exclude(int left, int top, int right, int bottom);
+-extern "C" void beachlife_hd_cover(int left, int top, int right, int bottom);
+ 
+ // Game pixels per sprite pixel: the near zoom doubles a half-size world, the far one halves sprites.
+ static float world_scale()
+@@ -51,7 +50,6 @@
+         {
+             const ScreenRectangle& area = entry->item->rectangle;
+             beachlife_hd_exclude(area.left, area.top, area.right, area.bottom);
+-            beachlife_hd_cover(area.left, area.top, area.right, area.bottom);
+         }
+     }
+     const float scale = world_scale();

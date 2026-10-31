@@ -1,0 +1,20 @@
+--- a/src/startup_renderer_shaded.cpp	2026-10-31 08:16:31
++++ b/src/startup_renderer_shaded.cpp	2026-10-31 08:16:31
+@@ -124,7 +124,7 @@
+             {
+                 int sample = static_cast<int>(column);
+                 ShadedChannels current = Shade(table, source[sample * 2], rgb555, light[column + 1]);
+-                ShadedChannels previous = Shade(table, source[sample * 2 - 2], rgb555, light[column]);
++                ShadedChannels previous = Shade(table, source[sample == 0 && source == pixels_1c ? 0 : sample * 2 - 2], rgb555, light[column]);
+                 pair = (static_cast<unsigned int>(current.Colour()) << 16) | Average(current, previous, rgb555);
+                 memcpy(destination + column * 4, &pair, sizeof(pair));
+                 memcpy(destination + pitch + column * 4, &pair, sizeof(pair));
+@@ -178,7 +178,7 @@
+                 int sample = static_cast<int>(column);
+                 sample += haze[haze_row + ((column - columns) & 31)];
+                 ShadedChannels current = Shade(table, source[sample * 2], rgb555, 0);
+-                ShadedChannels previous = Shade(table, source[sample * 2 - 2], rgb555, 0);
++                ShadedChannels previous = Shade(table, source[sample == 0 && source == pixels_1c ? 0 : sample * 2 - 2], rgb555, 0);
+                 pair = (static_cast<unsigned int>(current.Colour()) << 16) | Average(current, previous, rgb555);
+                 memcpy(destination + column * 4, &pair, sizeof(pair));
+                 memcpy(destination + pitch + column * 4, &pair, sizeof(pair));

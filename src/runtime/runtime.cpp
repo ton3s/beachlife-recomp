@@ -56,6 +56,57 @@ namespace beachlife::runtime
 {
 namespace
 {
+// The text the game drew this frame, at display resolution, in the font's scale.
+void draw_sharp_text(platform::Video& video, ImFont* font)
+{
+    if (!font)
+    {
+        return;
+    }
+    ImDrawList* list = ImGui::GetForegroundDrawList();
+    const auto transform = video.presentation_transform();
+    for (const auto& glyph : platform::hd_glyphs())
+    {
+        if (glyph.codepoint <= ' ' || glyph.x >= glyph.clip_right || glyph.y >= glyph.clip_bottom ||
+            glyph.x + glyph.width <= glyph.clip_left || glyph.y + glyph.height <= glyph.clip_top)
+        {
+            continue;
+        }
+        const auto corner = transform.to_window(glyph.x, glyph.y);
+        const auto opposite = transform.to_window(glyph.x + 1, glyph.y + 1);
+        const float scale = static_cast<float>(opposite.y - corner.y);
+        const float size = static_cast<float>(glyph.height) * scale * 0.95f;
+        const auto clip_min = transform.to_window(glyph.clip_left, glyph.clip_top);
+        const auto clip_max = transform.to_window(glyph.clip_right, glyph.clip_bottom);
+        char text[4] = {};
+        const unsigned int c = glyph.codepoint;
+        if (c < 0x80)
+        {
+            text[0] = static_cast<char>(c);
+        }
+        else if (c < 0x800)
+        {
+            text[0] = static_cast<char>(0xc0 | (c >> 6));
+            text[1] = static_cast<char>(0x80 | (c & 63));
+        }
+        else
+        {
+            text[0] = static_cast<char>(0xe0 | (c >> 12));
+            text[1] = static_cast<char>(0x80 | ((c >> 6) & 63));
+            text[2] = static_cast<char>(0x80 | (c & 63));
+        }
+        // Roboto's widths differ from the game font's, so centre each letter in the game's slot.
+        const float slot = static_cast<float>(glyph.width) * scale;
+        const float drawn = font->CalcTextSizeA(size, FLT_MAX, 0.0f, text).x;
+        const ImVec2 position(static_cast<float>(corner.x) + (slot - drawn) * 0.5f,
+            static_cast<float>(corner.y) - size * 0.05f);
+        const ImVec4 clip(static_cast<float>(clip_min.x), static_cast<float>(clip_min.y),
+            static_cast<float>(clip_max.x), static_cast<float>(clip_max.y));
+        list->AddText(font, size, position, IM_COL32(glyph.red, glyph.green, glyph.blue, 255), text,
+            nullptr, 0, &clip);
+    }
+}
+
 // The game's back buffer; the original's display modes are not mapped yet.
 constexpr int frame_width = 800, frame_height = 600;
 // The simulation's fixed step; the original's rate is not known yet either.
@@ -833,6 +884,7 @@ int run_game(const Options& options, detail::ConfigurationFactory configuration)
     };
     // Replaces the loading screen's font: the overlay's Roboto at the window's pixel
     // density, and the performance overlay's fonts for the window's current size.
+    ImFont* game_text_font = nullptr;
     float font_density = 0;
     const auto build_fonts = [&](int pixel_width, int pixel_height, float pixel_density)
     {
@@ -844,6 +896,9 @@ int run_game(const Options& options, detail::ConfigurationFactory configuration)
             throw std::runtime_error("The overlay font is missing. Restore the complete package.");
         }
         io.FontGlobalScale = 1 / pixel_density;
+        // Large enough to stay sharp when scaled to the game's text sizes on a big display.
+        game_text_font = io.Fonts->AddFontFromFileTTF(
+            platform::utf8(options.resources / "Roboto-Medium.ttf").c_str(), 40 * pixel_density);
         if (fps_overlay)
         {
             fps_overlay->add_fonts(*io.Fonts, pixel_width, pixel_height, pixel_density);
@@ -878,7 +933,11 @@ int run_game(const Options& options, detail::ConfigurationFactory configuration)
         retail_files::set_open_observer(game_file_opened, &pump);
         // The performance overlay over each frame the game presents.
         std::uint64_t overlay_frames = 0;
-        if (fps_overlay)
+        // Sharp text replaces the game's 800x600 glyphs, on iOS first.
+        const char* text_choice = SDL_getenv("BEACHLIFE_HD_TEXT");
+        const bool sharp_text = text_choice ? std::strcmp(text_choice, "0") != 0 : TouchInput::wanted();
+        platform::set_hd_text(sharp_text);
+        if (fps_overlay || sharp_text)
         {
             video.set_host_overlay(
                 [&]() -> ImDrawData*
@@ -887,17 +946,23 @@ int run_game(const Options& options, detail::ConfigurationFactory configuration)
                     const float pixel_density =
                         std::max(1.0f, SDL_GetWindowPixelDensity(video.window()));
                     if (pixel_density != font_density ||
-                        fps_overlay->needs_fonts(pixel_width, pixel_height, pixel_density))
+                        !io.FontDefault ||
+                        (fps_overlay && fps_overlay->needs_fonts(pixel_width, pixel_height, pixel_density)))
                     {
                         build_fonts(pixel_width, pixel_height, pixel_density);
                     }
                     video.new_overlay_frame();
                     ImGui_ImplSDL3_NewFrame();
                     ImGui::NewFrame();
-                    fps_overlay->draw(pixel_width, pixel_height, pixel_density);
+                    if (fps_overlay)
+                    {
+                        fps_overlay->draw(pixel_width, pixel_height, pixel_density);
+                    }
+                    draw_sharp_text(video, game_text_font);
                     ImGui::Render();
                     if (const auto rate =
-                            frame_rate.sample(++overlay_frames, std::chrono::steady_clock::now()))
+                            frame_rate.sample(++overlay_frames, std::chrono::steady_clock::now());
+                        rate && fps_overlay)
                     {
                         fps_overlay->set_rate(*rate);
                     }

@@ -25,3 +25,9 @@ A real mouse or trackpad stays a mouse. Edge scrolling is off in touch mode.
 `BEACHLIFE_TOUCH=1` enables touch on desktop; `BEACHLIFE_BOOT_TOUCH` scripts fingers.
 
 The app icon is a crop of `assets/launcher/header.jpg`; see `assets/launcher/README.md` for its provenance.
+
+## Display filter
+
+On Metal, the game's 800x600 picture is upscaled with a Catmull-Rom filter and
+contrast-adaptive sharpening (`src/platform/video_sdl_gpu.cpp`). `BEACHLIFE_SCALER=linear` restores
+the bilinear blit, and `BEACHLIFE_SCALER_SHARPNESS` (0 to 1, default 0.35) sets the strength.

@@ -1,0 +1,16 @@
+--- a/src/tweak_hd_buildings.cpp	2026-10-31 08:31:20
++++ b/src/tweak_hd_buildings.cpp	2026-10-31 08:31:20
+@@ -56,6 +56,13 @@
+     // Interface pixels can look like a sprite's (white on white), so name them outright.
+     beachlife_hd_exclude(0, screen_request_renderer->height - screen_request_renderer->word_60,
+         screen_request_renderer->width, screen_request_renderer->height);
++    // The floating map and progress panels are interface too.
++    if (screen_manager->byte_f8)
++        beachlife_hd_exclude(screen_manager->overlay_x_e8, screen_manager->overlay_y_ec,
++            screen_manager->overlay_right_f0, screen_manager->overlay_bottom_f4);
++    if (screen_manager->byte_15c)
++        beachlife_hd_exclude(screen_manager->layout_x_14c, screen_manager->layout_y_150,
++            screen_manager->layout_right_154, screen_manager->layout_bottom_158);
+     for (CircularListNode* node = screen_manager->active.head->next; node != screen_manager->active.head;
+         node = node->next)
+     {

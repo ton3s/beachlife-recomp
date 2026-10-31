@@ -1,0 +1,97 @@
+diff --git a/src/startup_screen_dialog_slot1c.cpp b/src/startup_screen_dialog_slot1c.cpp
+--- a/src/startup_screen_dialog_slot1c.cpp
++++ b/src/startup_screen_dialog_slot1c.cpp
+@@ -1,11 +1,8 @@
+-extern "C" void beachlife_hd_cover(int left, int top, int right, int bottom);
+ #include "startup_screen_dialog.h"
+ 
+ // FUNCTION: BEACHLIFE 0x004a5e70
+ void ScreenDialog::Unresolved1c()
+ {
+-    // A dialog hides the sharp text of whatever it covers; its own text follows.
+-    beachlife_hd_cover(rectangle.left, rectangle.top, rectangle.right, rectangle.bottom);
+     ScreenChildNode* node = children.head->next;
+     while (node != children.head)
+     {
+diff --git a/src/startup_screen_render.cpp b/src/startup_screen_render.cpp
+--- a/src/startup_screen_render.cpp
++++ b/src/startup_screen_render.cpp
+@@ -9,6 +9,8 @@
+ #include "window_activation.h"
+ 
+ // FUNCTION: BEACHLIFE 0x004af9a0
++extern "C" void beachlife_hd_text_pause(int paused);
++
+ void ScreenManager::RenderScreens()
+ {
+     if (window_deactivation_state)
+@@ -82,6 +84,9 @@
+         item_90->Unresolved0c();
+     }
+ 
++    // In the world, dialogs draw once into a cached surface, so a per-frame text list would
++    // lose their text. They keep the game's own glyphs.
++    beachlife_hd_text_pause(window_deactivation_state ? 1 : 0);
+     CircularListIterator last;
+     last.node = active.head;
+     CircularListIteratorAdaptor position(last);
+@@ -120,6 +125,7 @@
+         }
+         position.current.node = position.current.node->previous;
+     }
++    beachlife_hd_text_pause(0);
+ 
+     if (!screen_request_game->placement->byte_38 && !startup_input_motion_state->byte_20)
+     {
+diff --git a/src/startup_screen_dialog_world_draw.cpp b/src/startup_screen_dialog_world_draw.cpp
+--- a/src/startup_screen_dialog_world_draw.cpp
++++ b/src/startup_screen_dialog_world_draw.cpp
+@@ -4,6 +4,9 @@
+ #include "startup_screen_renderer.h"
+ #include "startup_resource_rasters.h"
+ #include "window_activation.h"
++
++#include <string.h>
++void beachlife_hd_sprite(ScreenDialogResource* image, int x, int y, int kind);
+ 
+ // FUNCTION: BEACHLIFE 0x00418cc0
+ ScreenPoint OverlayMapPrefix::WorldToTile(const ScreenWorldPosition* position)
+@@ -92,6 +95,9 @@
+     int bottom = SelectedFrame()->height_10;
+     if (screen_request_renderer->ClipRectangle(screen.x, screen.y, left, top, right, bottom))
+     {
++        const size_t name_length = strlen(record->name);
++        if (name_length > 5 && strcmp(record->name + name_length - 5, "_anim") == 0)
++            beachlife_hd_sprite(this, screen.x, screen.y, 3);
+         unsigned int depth = overlay_map->DepthAt(position) + 8;
+         if (record->format_18 == 3)
+         {
+diff --git a/src/tweak_hd_buildings.cpp b/src/tweak_hd_buildings.cpp
+--- a/src/tweak_hd_buildings.cpp
++++ b/src/tweak_hd_buildings.cpp
+@@ -15,6 +15,7 @@
+ // in front, the interface and lighting all keep working.
+ extern "C" void beachlife_hd_add(const char* key, int x, int y, int width, int height, float scale, int kind);
+ extern "C" void beachlife_hd_exclude(int left, int top, int right, int bottom);
++extern "C" void beachlife_hd_cover(int left, int top, int right, int bottom);
+ 
+ // Game pixels per sprite pixel: the near zoom doubles a half-size world, the far one halves sprites.
+ static float world_scale()
+@@ -30,7 +31,8 @@
+     sprintf(key, "%s_%u_%u_%u", image->record->name, image->word_10, image->word_18, image->word_14);
+     ScreenDialogResourceFrame* frame = image->record->frames[image->word_10];
+     const float scale = kind == 2 || screen_request_renderer->unscaled_clip_5c ? 1.0f : world_scale();
+-    beachlife_hd_add(key, x, y, frame->width_0e, frame->height_10, scale, kind);
++    beachlife_hd_add(key, static_cast<int>(x * scale), static_cast<int>(y * scale),
++        frame->width_0e, frame->height_10, scale, kind);
+ }
+ 
+ void beachlife_hd_collect()
+@@ -49,6 +51,7 @@
+         {
+             const ScreenRectangle& area = entry->item->rectangle;
+             beachlife_hd_exclude(area.left, area.top, area.right, area.bottom);
++            beachlife_hd_cover(area.left, area.top, area.right, area.bottom);
+         }
+     }
+     const float scale = world_scale();

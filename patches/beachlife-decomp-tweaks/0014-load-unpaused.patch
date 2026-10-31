@@ -1,0 +1,13 @@
+--- a/src/startup_world_load_state.cpp
++++ b/src/startup_world_load_state.cpp
+@@ -45,6 +45,10 @@
+     file->Unknown60(words_3b8, 32);
+     file->ReadByte(&deactivation_requested);
+     file->ReadByte(&pause_requested_43a);
++    // A save can record a pause that nothing on screen can undo: the app losing focus pauses
++    // the world just before its autosave. Keep only a pause the scenario's script forced.
++    if (!pause_requested_43a)
++        deactivation_requested = 0;
+     ReadUnsigned(file, &guests_43c);
+     ReadUnsigned(file, &litter_440);
+     ReadUnsigned(file, &word_444);

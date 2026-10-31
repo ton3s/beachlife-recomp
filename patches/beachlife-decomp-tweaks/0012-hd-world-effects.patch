@@ -1,0 +1,102 @@
+--- a/src/startup_world_guest_draw.cpp	2026-10-31 08:28:21
++++ b/src/startup_world_guest_draw.cpp	2026-10-31 08:28:21
+@@ -4,6 +4,8 @@
+ #include "startup_screen_renderer.h"
+ #include "startup_screen_overlay_layout.h"
+ #include "window_activation.h"
++
++void beachlife_hd_mark_person(float x, float y, float z);
+ #include <bit>
+ 
+ void DrawGuestHappiness(ScreenPoint* position, float happiness, ScreenDialogResource* resource); // 0x0047c0a0.
+@@ -27,6 +29,7 @@
+ {
+     if (flags_d0[1])
+         return;
++    beachlife_hd_mark_person(x_30, y_34, z_38);
+     if (word_310)
+     {
+         ScreenWorldPosition position = { static_cast<float>(static_cast<double>(x_30) - word_320), static_cast<float>(static_cast<double>(y_34) - word_324), z_38 };
+--- a/src/startup_world_lifeguard_draw.cpp	2026-10-31 08:28:21
++++ b/src/startup_world_lifeguard_draw.cpp	2026-10-31 08:28:21
+@@ -1,11 +1,14 @@
+ #include "startup_world_entities.h"
+ #include "window_activation.h"
+ 
++void beachlife_hd_mark_person(float x, float y, float z);
++
+ // FUNCTION: BEACHLIFE 0x0047e7e0
+ void WorldLifeguardEntity::Unknown3c()
+ {
+     if (flags_d0[1])
+         return;
++    beachlife_hd_mark_person(x_30, y_34, z_38);
+     if (attached_7f0)
+     {
+         ScreenWorldPosition position = {
+--- a/src/startup_world_representative_draw.cpp	2026-10-31 08:28:21
++++ b/src/startup_world_representative_draw.cpp	2026-10-31 08:28:21
+@@ -1,11 +1,14 @@
+ #include "startup_world_entities.h"
+ #include "window_activation.h"
+ 
++void beachlife_hd_mark_person(float x, float y, float z);
++
+ // FUNCTION: BEACHLIFE 0x004884f0
+ void WorldRepresentativeEntity::Unknown3c()
+ {
+     if (flags_d0[1])
+         return;
++    beachlife_hd_mark_person(x_30, y_34, z_38);
+     if (attached_864)
+     {
+         ScreenWorldPosition position = { x_30, y_34, z_38 };
+--- a/src/tweak_hd_buildings.cpp	2026-10-31 08:28:21
++++ b/src/tweak_hd_buildings.cpp	2026-10-31 08:28:21
+@@ -1,3 +1,4 @@
++#include "startup_config_owner.h"
+ #include "startup_building_status.h"
+ #include <stdio.h>
+ #include "startup_pointer_list_operations.h"
+@@ -15,6 +16,8 @@
+ // in front, the interface and lighting all keep working.
+ extern "C" void beachlife_hd_add(const char* key, int x, int y, int width, int height, float scale, int kind);
+ extern "C" void beachlife_hd_exclude(int left, int top, int right, int bottom);
++extern "C" void beachlife_hd_world(int origin_x, int origin_y, float scale, float hour, int lighting);
++extern "C" void beachlife_hd_person(int x, int y, float scale);
+ 
+ // Game pixels per sprite pixel: the near zoom doubles a half-size world, the far one halves sprites.
+ static float world_scale()
+@@ -34,6 +37,17 @@
+         frame->width_0e, frame->height_10, scale, kind);
+ }
+ 
++// Where a person stands this frame, for the shadow or ripple under them.
++void beachlife_hd_mark_person(float x, float y, float z)
++{
++    if (screen_request_renderer->unscaled_clip_5c)
++        return;
++    const float scale = world_scale();
++    ScreenWorldPosition position = { x, y, z };
++    ScreenPoint screen = overlay_map->WorldToScreen(position);
++    beachlife_hd_person(static_cast<int>(screen.x * scale), static_cast<int>(screen.y * scale), scale);
++}
++
+ void beachlife_hd_collect()
+ {
+     if (!window_deactivation_state || !screen_manager || !overlay_map || !variable_world ||
+@@ -53,6 +67,14 @@
+         }
+     }
+     const float scale = world_scale();
++    {
++        // Effects stay fixed to the island as the view moves, so they need the view's position.
++        ScreenWorldPosition origin = { 0.0f, 0.0f, 0.0f };
++        ScreenPoint view = overlay_map->WorldToScreen(origin);
++        bool lighting = false;
++        startup_config_owner->GetBool(&lighting, "bNIGHT_DAY_ENABLED");
++        beachlife_hd_world(view.x, view.y, scale, window_deactivation_state->render_value_160, lighting);
++    }
+     for (unsigned int i = 0; i < variable_world->buildings_04; ++i)
+     {
+         VariableEntity* entity = variable_world->buildings_12120[i];

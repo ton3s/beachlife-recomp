@@ -1,0 +1,30 @@
+diff --git a/src/startup_tga_screen_item_draw.cpp b/src/startup_tga_screen_item_draw.cpp
+--- a/src/startup_tga_screen_item_draw.cpp
++++ b/src/startup_tga_screen_item_draw.cpp
+@@ -1,5 +1,10 @@
+ #include "startup_tga_screen_item.h"
+ #include "startup_screen_renderer.h"
++
++#include <stdio.h>
++#include <string.h>
++
++extern "C" void beachlife_hd_add(const char* key, int x, int y, int width, int height, float scale, int kind);
+ 
+ // FUNCTION: BEACHLIFE 0x004c8710
+ void TgaScreenItem::Unresolved0c()
+@@ -9,4 +14,15 @@
+     destination.x = 0;
+     destination.y = 0;
+     screen_request_renderer->DrawTga(destination, bounds, image, 0, 0, 0);
++    // Full-screen art: named after its file, without folder or extension, in lower case.
++    const char* name = filename;
++    for (const char* at = filename; *at; ++at)
++        if (*at == '/' || *at == '\\')
++            name = at + 1;
++    char key[160] = "screen_";
++    size_t length = strlen(key);
++    for (; *name && *name != '.' && length + 1 < sizeof key; ++name, ++length)
++        key[length] = (*name >= 'A' && *name <= 'Z') ? static_cast<char>(*name + 32) : *name;
++    key[length] = 0;
++    beachlife_hd_add(key, 0, 0, 800, 600, 1.0f, 2);
+ }

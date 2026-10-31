@@ -1,0 +1,27 @@
+diff --git a/src/startup_screen_dialog_slot1c.cpp b/src/startup_screen_dialog_slot1c.cpp
+--- a/src/startup_screen_dialog_slot1c.cpp
++++ b/src/startup_screen_dialog_slot1c.cpp
+@@ -1,8 +1,11 @@
++extern "C" void beachlife_hd_cover(int left, int top, int right, int bottom);
+ #include "startup_screen_dialog.h"
+ 
+ // FUNCTION: BEACHLIFE 0x004a5e70
+ void ScreenDialog::Unresolved1c()
+ {
++    // A dialog hides the sharp text of whatever it covers; its own text follows.
++    beachlife_hd_cover(rectangle.left, rectangle.top, rectangle.right, rectangle.bottom);
+     ScreenChildNode* node = children.head->next;
+     while (node != children.head)
+     {
+diff --git a/src/startup_font_draw_line.cpp b/src/startup_font_draw_line.cpp
+--- a/src/startup_font_draw_line.cpp
++++ b/src/startup_font_draw_line.cpp
+@@ -50,7 +50,7 @@
+         {
+             const unsigned short* cell = data->glyphs[*glyph];
+             const int advance = cell[2] - cell[0];
+-            beachlife_hd_glyph(*glyph, pen, top, advance, data->unknown_10804[0], colour,
++            beachlife_hd_glyph(*glyph, pen, top, advance, cell[3] - cell[1], colour,
+                 clip.x, clip.y, clip.x + clip.width, clip.y + clip.height);
+             pen += advance;
+             if (glyph[1] != 0)

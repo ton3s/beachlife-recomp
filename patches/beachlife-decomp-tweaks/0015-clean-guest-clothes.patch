@@ -1,0 +1,161 @@
+diff --git a/src/tweak_clean_clothes.cpp b/src/tweak_clean_clothes.cpp
+new file mode 100644
+--- /dev/null
++++ b/src/tweak_clean_clothes.cpp
+@@ -0,0 +1,101 @@
++#include <vector>
++
++// The guests' clothes are palette ramps painted into small sprites, with stray specks of skin
++// inside them and stray clothes on the skin, which show badly when zoomed in. This tidies each
++// frame as it loads. Only the colour of opaque pixels changes, so the outline, hit testing and
++// the encoded size all stay the same. It works for every palette, since it moves indices.
++namespace
++{
++constexpr int first_clothes = 32, ramp_size = 8, ramps = 4;
++
++int ramp_of(int index)
++{
++    return index >= first_clothes && index < first_clothes + ramp_size * ramps
++        ? 1 + (index - first_clothes) / ramp_size
++        : 0;
++}
++
++// Walks one frame's runs: a byte of 128 or more skips 256 - byte pixels, others are literals.
++template <class Pixel>
++void walk_runs(unsigned char* data, const unsigned char* end, int width, int height, Pixel pixel)
++{
++    for (int y = 0; y < height; ++y)
++    {
++        int x = 0;
++        while (x < width)
++        {
++            if (data >= end)
++                return;
++            const int code = *data++;
++            if (code >= 128)
++            {
++                x += 256 - code;
++                continue;
++            }
++            for (int i = 0; i < code; ++i, ++x)
++            {
++                if (data >= end)
++                    return;
++                if (x < width)
++                    pixel(x, y, data);
++                ++data;
++            }
++        }
++    }
++}
++
++int most_common(const int* counts)
++{
++    int best = -1;
++    for (int index = 0; index < 256; ++index)
++        if (counts[index] && (best < 0 || counts[index] > counts[best]))
++            best = index;
++    return best;
++}
++} // namespace
++
++extern "C" void beachlife_clean_clothes(unsigned char* data, const unsigned char* end, int width, int height)
++{
++    std::vector<short> grid(static_cast<size_t>(width) * height, -1);
++    walk_runs(data, end, width, height,
++        [&](int x, int y, unsigned char* at) { grid[static_cast<size_t>(y) * width + x] = *at; });
++    walk_runs(data, end, width, height, [&](int x, int y, unsigned char* at) {
++        int indices[256] = {};
++        int per_ramp[ramps + 1] = {};
++        int opaque = 0;
++        for (int dy = -1; dy <= 1; ++dy)
++            for (int dx = -1; dx <= 1; ++dx)
++            {
++                const int nx = x + dx, ny = y + dy;
++                if ((!dx && !dy) || nx < 0 || ny < 0 || nx >= width || ny >= height)
++                    continue;
++                const int index = grid[static_cast<size_t>(ny) * width + nx];
++                if (index < 0)
++                    continue;
++                ++indices[index];
++                ++per_ramp[ramp_of(index)];
++                ++opaque;
++            }
++        const int own = ramp_of(*at);
++        const int clothes = opaque - per_ramp[0];
++        if (clothes - (own ? per_ramp[own] : 0) >= 5 && (!own || per_ramp[own] <= 1))
++        {
++            // A speck inside clothing takes the commonest shade of that clothing around it.
++            for (int ramp = 0; ramp <= ramps; ++ramp)
++                if (ramp == 0 || ramp == own)
++                    for (int index = 0; index < 256; ++index)
++                        if (ramp_of(index) == ramp)
++                            indices[index] = 0;
++            *at = static_cast<unsigned char>(most_common(indices));
++        }
++        else if (own && clothes <= 1 && opaque >= 4)
++        {
++            // A lone speck of clothing on bare skin takes the commonest colour around it.
++            for (int index = first_clothes; index < first_clothes + ramp_size * ramps; ++index)
++                indices[index] = 0;
++            const int replacement = most_common(indices);
++            if (replacement >= 0)
++                *at = static_cast<unsigned char>(replacement);
++        }
++    });
++}
+--- a/src/startup_screen_dialog_metadata.h
++++ b/src/startup_screen_dialog_metadata.h
+@@ -118,6 +118,8 @@
+     {
+         record.frames[frame] = new ScreenDialogResourceFrame;
+         record.frames[frame]->ReadMetadata(stream);
++        // The four guest bodies get their clothes tidied as they load.
++        record.frames[frame]->unknown_09 = record.word_1c != 0;
+     }
+ }
+ 
+--- a/src/startup_screen_dialog_frame_load_all.cpp
++++ b/src/startup_screen_dialog_frame_load_all.cpp
+@@ -7,6 +7,8 @@
+ #define _lseek ScreenDialogFrameSeek32
+ #define _read  ScreenDialogFrameRead32
+ 
++extern "C" void beachlife_clean_clothes(unsigned char* data, const unsigned char* end, int width, int height);
++
+ // FUNCTION: BEACHLIFE 0x00416f10
+ void ScreenDialogResourceFrame::LoadAllData()
+ {
+@@ -28,5 +30,8 @@
+     data_4c = static_cast<unsigned char*>(::operator new(data_bytes));
+     read_result = _read(screen_dialog_frame_file, data_4c, data_size_18);
+     screen_dialog_frame_cursor += read_result;
++    if (unknown_09)
++        for (unsigned int i = 0; i < offset_count_40; ++i)
++            beachlife_clean_clothes(data_4c + offsets_70[i], data_4c + data_bytes, width_0e, height_10);
+     loaded_08 = 1;
+ }
+--- a/src/startup_screen_dialog_frame_load_plane.cpp
++++ b/src/startup_screen_dialog_frame_load_plane.cpp
+@@ -7,6 +7,8 @@
+ #define _lseek ScreenDialogFrameSeek32
+ #define _read  ScreenDialogFrameRead32
+ 
++extern "C" void beachlife_clean_clothes(unsigned char* data, const unsigned char* end, int width, int height);
++
+ // FUNCTION: BEACHLIFE 0x00416fe0
+ void ScreenDialogResourceFrame::LoadPlaneData(int plane)
+ {
+@@ -56,5 +58,12 @@
+     plane_data_50[plane] = static_cast<unsigned char*>(::operator new(data_bytes));
+     int read_result = _read(screen_dialog_frame_file, plane_data_50[plane], data_bytes);
+     screen_dialog_frame_cursor += read_result;
++    if (unknown_09)
++        for (int i = 0; i < count_0a; ++i)
++        {
++            const unsigned int offset = offsets_70[indices_44[count_0a * plane + i]] - plane_offsets_20[plane];
++            beachlife_clean_clothes(plane_data_50[plane] + offset, plane_data_50[plane] + data_bytes,
++                width_0e, height_10);
++        }
+     loaded_08 = 1;
+ }

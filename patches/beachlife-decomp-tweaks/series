@@ -3,3 +3,16 @@
 0002-skip-intro.patch
 0003-touch-input.patch
 0004-touch-autosave.patch
+0005-hd-buildings.patch
+0006-hd-interface-and-zoom.patch
+0007-hd-screens.patch
+0008-hd-text-layers.patch
+0009-hd-cached-dialogs-and-animations.patch
+0010-hd-dialog-live-text-and-leading.patch
+0011-near-zoom-buffer-underread.patch
+0012-hd-world-effects.patch
+0013-hd-panels-excluded.patch
+0014-load-unpaused.patch
+0015-clean-guest-clothes.patch
+0016-touch-stops-following.patch
+0017-waterfall-effect.patch
