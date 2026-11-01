@@ -1,0 +1,22 @@
+--- a/src/tweak_hd_buildings.cpp
++++ b/src/tweak_hd_buildings.cpp
+@@ -2,6 +2,8 @@
+ #include "startup_config_owner.h"
+ #include "startup_building_status.h"
+ #include <stdio.h>
++#include <strings.h>
++#include <string.h>
+ #include "startup_pointer_list_operations.h"
+ #include "startup_screen_dialog.h"
+ #include "startup_screen_dialog_resource.h"
+@@ -87,8 +89,8 @@
+         bool lighting = false;
+         startup_config_owner->GetBool(&lighting, "bNIGHT_DAY_ENABLED");
+         beachlife_hd_world(view.x, view.y, scale, window_deactivation_state->render_value_160, lighting);
+-        // Only the first scenario's island has a waterfall painted into its terrain.
+-        beachlife_hd_waterfall(screen_request_game && screen_request_game->scenario_a0 == 0 && !screen_request_game->byte_a4);
++        // Only this map has a waterfall painted into its terrain, whichever mode plays on it.
++        beachlife_hd_waterfall(strcasestr(window_deactivation_state->path_54, "scenario1/scenario1.biz") != nullptr);
+     }
+     for (unsigned int i = 0; i < variable_world->buildings_04; ++i)
+     {
