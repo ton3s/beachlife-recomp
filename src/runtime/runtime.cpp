@@ -407,6 +407,18 @@ void advance_route(GamePumpState& state)
     }
 }
 
+// iOS has no command line: BEACHLIFE_BOOT_SHOT_FILE names the shots, relative to the app's home.
+std::filesystem::path scripted_screenshot(const std::filesystem::path& from_options)
+{
+    const char* text = SDL_getenv("BEACHLIFE_BOOT_SHOT_FILE");
+    if (!text || !*text)
+    {
+        return from_options;
+    }
+    const char* home = SDL_getenv("HOME");
+    return std::filesystem::path(home ? home : "") / text;
+}
+
 std::vector<std::uint64_t> scripted_shots()
 {
     std::vector<std::uint64_t> shots;
@@ -911,7 +923,7 @@ int run_game(const Options& options, detail::ConfigurationFactory configuration)
         GamePumpState pump{&video,
             0,
             static_cast<std::uint64_t>(options.frames),
-            options.screenshot,
+            scripted_screenshot(options.screenshot),
             scripted_clicks(),
             scripted_keys(),
             scripted_wheels(),

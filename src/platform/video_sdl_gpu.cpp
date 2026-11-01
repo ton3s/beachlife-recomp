@@ -389,6 +389,19 @@ struct HdPerson
     float scale;
 };
 std::vector<HdPerson> hd_people;
+
+// For the status line of a performance run: time inside present, and the part spent waiting
+// for the GPU or the display to free a swapchain image.
+Uint64 present_total_ns = 0, present_wait_ns = 0, present_frames = 0;
+struct PresentTimer
+{
+    Uint64 started = SDL_GetTicksNS();
+    ~PresentTimer()
+    {
+        present_total_ns += SDL_GetTicksNS() - started;
+        ++present_frames;
+    }
+};
 bool hd_waterfall = false;
 int hd_text_enabled = 0;
 int hd_text_paused = 0;
@@ -619,6 +632,7 @@ class SdlGpuVideo : public Video
 
     void present(const Frame& frame, ImDrawData* overlay) override
     {
+        const PresentTimer timer;
         if (!overlay)
         {
             overlay = host_overlay();
@@ -661,11 +675,13 @@ class SdlGpuVideo : public Video
         prepare_hd(commands);
         SDL_GPUTexture* swapchain = nullptr;
         Uint32 window_width = 0, window_height = 0;
+        const Uint64 wait_started = SDL_GetTicksNS();
         if (!SDL_WaitAndAcquireGPUSwapchainTexture(
                 commands, window_, &swapchain, &window_width, &window_height))
         {
             fail("Cannot present the frame");
         }
+        present_wait_ns += SDL_GetTicksNS() - wait_started;
         if (!swapchain)
         { // minimized: nothing to show
             SDL_SubmitGPUCommandBuffer(commands);
@@ -1509,6 +1525,20 @@ void set_hd_text(bool enabled)
 }
 
 } // namespace beachlife::platform
+
+extern "C" void beachlife_present_stats(
+    double* total_ms, double* wait_ms, int* items, int* people, int* excluded, int* glyphs)
+{
+    using namespace beachlife::platform;
+    const double frames = present_frames ? static_cast<double>(present_frames) : 1;
+    *total_ms = static_cast<double>(present_total_ns) / 1e6 / frames;
+    *wait_ms = static_cast<double>(present_wait_ns) / 1e6 / frames;
+    present_total_ns = present_wait_ns = present_frames = 0;
+    *items = static_cast<int>(hd_items.size());
+    *people = static_cast<int>(hd_people.size());
+    *excluded = static_cast<int>(hd_excluded.size());
+    *glyphs = static_cast<int>(hd_glyphs_list.size());
+}
 
 extern "C" void beachlife_hd_begin(void)
 {

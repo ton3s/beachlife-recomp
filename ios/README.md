@@ -23,6 +23,8 @@ A real mouse or trackpad stays a mouse. Edge scrolling is off in touch mode.
 `src/runtime/touch_gestures.cpp` recognizes gestures and has unit tests;
 `src/runtime/touch_input.cpp` feeds them to the game.
 `BEACHLIFE_TOUCH=1` enables touch on desktop; `BEACHLIFE_BOOT_TOUCH` scripts fingers.
+`BEACHLIFE_TOUCH_LOG=1` logs frame rate, thermal state, frame timing and the camera; `BEACHLIFE_BOOT_SHOTS` with `BEACHLIFE_BOOT_SHOT_FILE` (relative to the app's home) saves screenshots from a device.
+iOS runs at 60 fps; `BEACHLIFE_FPS_LIMIT` changes the limit and `0` removes it.
 
 The app icon is a crop of `assets/launcher/header.jpg`; see `assets/launcher/README.md` for its provenance.
 

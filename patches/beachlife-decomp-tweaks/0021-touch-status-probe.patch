@@ -1,0 +1,20 @@
+diff --git a/src/tweak_touch.cpp b/src/tweak_touch.cpp
+--- a/src/tweak_touch.cpp
++++ b/src/tweak_touch.cpp
+@@ -65,3 +65,16 @@
+ extern "C" void beachlife_touch_register(
+     int (*)(void), void (*)(float, float), void (*)(float, float));
+ static const int touch_registered = (beachlife_touch_register(drag_under_cursor, pan, fling), 0);
++
++extern "C" void beachlife_touch_register_probe(void (*)(float*, float*, int*, int*, float*));
++static void probe(float* x, float* y, int* zoom, int* guests, float* clock)
++{
++    if (!window_deactivation_state || !overlay_map)
++        return;
++    *x = overlay_map->view_x_e4;
++    *y = overlay_map->view_y_e8;
++    *zoom = window_deactivation_state->zoom_6f8;
++    *guests = overlay_map->rendered_guests_158;
++    *clock = window_deactivation_state->clock_158;
++}
++static const int probe_registered = (beachlife_touch_register_probe(probe), 0);

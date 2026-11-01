@@ -36,4 +36,6 @@ extern "C"
     // the game leave these unset, and the gestures treat everything as interface.
     void beachlife_touch_register(
         int (*drag_under_cursor)(void), void (*pan)(float, float), void (*fling)(float, float));
+    // Reports view x and y, zoom, guests drawn and the day clock for BEACHLIFE_TOUCH_LOG.
+    void beachlife_touch_register_probe(void (*probe)(float*, float*, int*, int*, float*));
 }

@@ -17,6 +17,10 @@
 #include <string>
 #include <vector>
 
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+extern "C" void beachlife_present_stats(double*, double*, int*, int*, int*, int*);
+#endif
+
 namespace
 {
 bool touch_mode = false;
@@ -24,6 +28,7 @@ int (*game_drag_under_cursor)(void) = nullptr;
 void (*game_pan)(float, float) = nullptr;
 void (*game_fling)(float, float) = nullptr;
 int (*game_autosave)(void) = nullptr;
+void (*game_probe)(float*, float*, int*, int*, float*) = nullptr;
 }
 
 extern "C" void beachlife_touch_register_autosave(int (*autosave)(void))
@@ -37,6 +42,11 @@ extern "C" void beachlife_touch_register(
     game_drag_under_cursor = drag_under_cursor;
     game_pan = pan;
     game_fling = fling;
+}
+
+extern "C" void beachlife_touch_register_probe(void (*probe)(float*, float*, int*, int*, float*))
+{
+    game_probe = probe;
 }
 
 extern "C" int beachlife_touch_mode(void)
@@ -121,7 +131,21 @@ struct TouchInput::State
     double last_autosave = now_seconds();
     double autosave_every = autosave_seconds();
     bool logging = SDL_getenv("BEACHLIFE_TOUCH_LOG") != nullptr;
-    unsigned long long current_frame = 0;
+    unsigned long long current_frame = 0, status_frame = 0;
+    double status_seconds = 0;
+    Uint64 next_frame = 0;
+    Uint64 frame_ns = [] {
+        // Holding 120 Hz makes iPadOS cut GPU power until the rate falls to about 60 anyway, and
+        // heats the device. A steady 60 keeps the game clock the same, as it runs on real time.
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+        constexpr int default_rate = 60;
+#else
+        constexpr int default_rate = 0;
+#endif
+        const char* text = SDL_getenv("BEACHLIFE_FPS_LIMIT");
+        const int rate = text ? SDL_atoi(text) : default_rate;
+        return rate > 0 ? 1000000000ull / static_cast<Uint64>(rate) : 0ull;
+    }();
     std::vector<Scripted> script = scripted_fingers();
     std::string touch_mouse, mouse_touch;
 
@@ -321,6 +345,52 @@ struct TouchInput::State
         }
     }
 
+    // What a performance run needs to tell heat from load, without a debugger on the device.
+    void log_status(unsigned long long frame_number)
+    {
+        const double now = now_seconds();
+        const double rate =
+            now > status_seconds ? (frame_number - status_frame) / (now - status_seconds) : 0;
+        status_seconds = now;
+        status_frame = frame_number;
+        float view_x = 0, view_y = 0, clock = 0;
+        int zoom = -1, guests = -1;
+        if (game_probe)
+        {
+            game_probe(&view_x, &view_y, &zoom, &guests, &clock);
+        }
+        int thermal = -1;
+#if defined(TARGET_OS_IOS) && TARGET_OS_IOS
+        thermal = thermal_state();
+        double present_ms = 0, wait_ms = 0;
+        int items = 0, people = 0, excluded = 0, glyphs = 0;
+        beachlife_present_stats(&present_ms, &wait_ms, &items, &people, &excluded, &glyphs);
+        std::fprintf(stderr,
+            "Frame: %.2f ms each, present %.2f ms of which wait %.2f ms; items %d people %d excluded %d glyphs %d\n",
+            rate > 0 ? 1000 / rate : 0, present_ms, wait_ms, items, people, excluded, glyphs);
+#endif
+        std::fprintf(stderr,
+            "Status: frame %llu at %.1fs fps %.1f thermal %d view %.0f %.0f zoom %d guests-drawn %d clock %.0f\n",
+            frame_number, now, rate, thermal, view_x, view_y, zoom, guests, clock);
+        std::fflush(stderr);
+    }
+
+    // Pace by clock, so a late frame does not make the next one wait a whole interval.
+    void limit_rate()
+    {
+        if (frame_ns == 0)
+        {
+            return;
+        }
+        const Uint64 now = SDL_GetTicksNS();
+        if (next_frame > now)
+        {
+            SDL_DelayPrecise(next_frame - now);
+        }
+        const Uint64 base = next_frame > now ? next_frame : now;
+        next_frame = base + frame_ns;
+    }
+
     void run_script(unsigned long long frame_number)
     {
         const auto transform = video.presentation_transform();
@@ -378,6 +448,7 @@ TouchInput::~TouchInput()
 
 void TouchInput::frame(unsigned long long frame_number)
 {
+    state_->limit_rate();
     // Between frames the world is consistent, and iOS still gives this moment to run.
     if (state_->autosave_wanted)
     {
@@ -404,8 +475,7 @@ void TouchInput::frame(unsigned long long frame_number)
     state_->current_frame = frame_number;
     if (state_->logging && frame_number % 300 == 0)
     {
-        std::fprintf(stderr, "Touch: frame %llu at %.1fs\n", frame_number, now_seconds());
-        std::fflush(stderr);
+        state_->log_status(frame_number);
     }
     state_->run_script(frame_number);
     state_->gestures.tick(now_seconds());
