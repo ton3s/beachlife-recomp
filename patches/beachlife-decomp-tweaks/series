@@ -20,3 +20,4 @@
 0019-autosave-failure-not-fatal.patch
 0020-waterfall-by-map.patch
 0021-touch-status-probe.patch
+0022-skip-blits-outside-the-surface.patch

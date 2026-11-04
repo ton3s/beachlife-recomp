@@ -148,6 +148,44 @@ void WordSurface16::set_source_key(std::uint16_t key)
     source_key_ = key;
 }
 
+namespace
+{
+bool source_inside(const WordSurface16& source, Rectangle rectangle)
+{
+    const auto description = source.description();
+    return rectangle.left >= 0 && rectangle.top >= 0 && rectangle.right >= rectangle.left &&
+           rectangle.bottom >= rectangle.top && rectangle.right <= description.width &&
+           rectangle.bottom <= description.height;
+}
+
+bool nonempty_inside(Rectangle rectangle, int width, int height)
+{
+    return rectangle.left >= 0 && rectangle.top >= 0 && rectangle.right > rectangle.left &&
+           rectangle.bottom > rectangle.top && rectangle.right <= width && rectangle.bottom <= height;
+}
+} // namespace
+
+bool WordSurface16::copy_fits(
+    const WordSurface16& source, Rectangle source_rectangle, int left, int top) const
+{
+    if (!source_inside(source, source_rectangle))
+    {
+        return false;
+    }
+    const int columns = source_rectangle.right - source_rectangle.left;
+    const int rows = source_rectangle.bottom - source_rectangle.top;
+    return columns <= width_ && rows <= height_ && left >= 0 && top >= 0 &&
+           left <= width_ - columns && top <= height_ - rows;
+}
+
+bool WordSurface16::blit_fits(const WordSurface16& source,
+    Rectangle source_rectangle,
+    Rectangle destination_rectangle) const
+{
+    return nonempty_inside(source_rectangle, source.width_, source.height_) &&
+           nonempty_inside(destination_rectangle, width_, height_);
+}
+
 void WordSurface16::copy_from(
     const WordSurface16& source, Rectangle source_rectangle, int left, int top, bool use_source_key)
 {
@@ -157,17 +195,13 @@ void WordSurface16::copy_from(
     {
         throw std::invalid_argument("Word surface copy formats differ");
     }
-    if (source_rectangle.left < 0 || source_rectangle.top < 0 ||
-        source_rectangle.right < source_rectangle.left ||
-        source_rectangle.bottom < source_rectangle.top || source_rectangle.right > source.width_ ||
-        source_rectangle.bottom > source.height_)
+    if (!source_inside(source, source_rectangle))
     {
         throw std::out_of_range("Word surface source rectangle is outside storage");
     }
     const int columns = source_rectangle.right - source_rectangle.left;
     const int rows = source_rectangle.bottom - source_rectangle.top;
-    if (columns > width_ || rows > height_ || left < 0 || top < 0 || left > width_ - columns ||
-        top > height_ - rows)
+    if (!copy_fits(source, source_rectangle, left, top))
     {
         throw std::out_of_range("Word surface destination rectangle is outside storage");
     }
@@ -219,14 +253,7 @@ void WordSurface16::blit_from(const WordSurface16& source,
     {
         throw std::invalid_argument("Word surface blit formats differ");
     }
-    const auto contained = [](Rectangle rectangle, int width, int height)
-    {
-        return rectangle.left >= 0 && rectangle.top >= 0 && rectangle.right > rectangle.left &&
-               rectangle.bottom > rectangle.top && rectangle.right <= width &&
-               rectangle.bottom <= height;
-    };
-    if (!contained(source_rectangle, source.width_, source.height_) ||
-        !contained(destination_rectangle, width_, height_))
+    if (!blit_fits(source, source_rectangle, destination_rectangle))
     {
         throw std::out_of_range("Word surface blit rectangles must be nonempty and contained");
     }

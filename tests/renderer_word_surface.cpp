@@ -204,6 +204,21 @@ void stretches()
         std::array<std::uint16_t, 4>{0x1234, 0x1234, 0x8000, 0x8000},
         "RGB555 stretched key comparison must retain bit15");
 
+    // The pointer at the last column: Beach Life asks for an empty rectangle there.
+    require(!small.blit_fits(large, {0, 0, 0, 2}, {2, 0, 2, 2}), "An empty blit must not fit");
+    require(!small.blit_fits(large, {0, 0, 2, 2}, {2, 0, 4, 2}), "A blit past the edge must not fit");
+    require(!small.blit_fits(large, {0, 0, 2, 2}, {-1, 0, 1, 2}), "A blit before the edge must not fit");
+    require(small.blit_fits(large, {0, 0, 5, 3}, {0, 0, 3, 2}), "A contained blit must fit");
+    require(!small.copy_fits(large, {0, 0, 2, 2}, 2, 0), "A copy past the edge must not fit");
+    require(!small.copy_fits(large, {0, 0, 2, 2}, 0, -1), "A copy above the edge must not fit");
+    require(!small.copy_fits(large, {0, 0, 6, 2}, 0, 0), "A copy from outside the source must not fit");
+    require(small.copy_fits(large, {1, 1, 3, 3}, 1, 0), "A contained copy must fit");
+    rejects<std::out_of_range>(
+        [&]
+        {
+            small.blit_from(large, {0, 0, 0, 2}, {2, 0, 2, 2});
+        });
+
     small.lock();
     rejects<std::logic_error>(
         [&]

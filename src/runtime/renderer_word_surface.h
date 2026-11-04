@@ -84,6 +84,14 @@ class WordSurface16
         Rectangle destination_rectangle,
         bool use_source_key = false);
 
+    // Whether copy_from or blit_from would accept these rectangles. DirectDraw answered a
+    // rectangle outside the surface with DDERR_INVALIDRECT and drew nothing; callers that
+    // stand in for it test first and skip the draw.
+    bool copy_fits(const WordSurface16& source, Rectangle source_rectangle, int left, int top) const;
+    bool blit_fits(const WordSurface16& source,
+        Rectangle source_rectangle,
+        Rectangle destination_rectangle) const;
+
   private:
     friend class FlipChain16;
     void require_thread() const;

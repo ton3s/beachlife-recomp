@@ -1,0 +1,100 @@
+diff --git a/src/startup_renderer_blit_surface_region.cpp b/src/startup_renderer_blit_surface_region.cpp
+--- a/src/startup_renderer_blit_surface_region.cpp
++++ b/src/startup_renderer_blit_surface_region.cpp
+@@ -4,6 +4,7 @@
+ #include "runtime/renderer_word_surface.h"
+ #include <cstdint>
+ #include <stdexcept>
++#include <cstdio>
+ 
+ // FUNCTION: BEACHLIFE 0x0040e990
+ void ScreenRequestRenderer::BlitSurfaceRegion(
+@@ -55,6 +56,22 @@
+     if (!native_chain || native_back != &native_chain->back_surface() || !image->native_surface)
+         throw std::logic_error("BlitSurfaceRegion requires the real mode0 back and source surfaces");
+ 
++    // DirectDraw drew nothing for a rectangle outside the surface or empty, such as the
++    // pointer's last column at the right edge; the game ignored the error and went on.
++    if (!native_back->blit_fits(*image->native_surface,
++            { source.left, source.top, source.right, source.bottom },
++            { destination.left, destination.top, destination.right, destination.bottom }))
++    {
++        static bool reported = false;
++        if (!reported)
++        {
++            reported = true;
++            std::fprintf(stderr, "Skipped BlitSurfaceRegion: source %d %d %d %d destination %d %d %d %d surface %d\n",
++                source.left, source.top, source.right, source.bottom,
++                destination.left, destination.top, destination.right, destination.bottom, surface);
++        }
++        return;
++    }
+     native_back->blit_from(*image->native_surface,
+         { source.left, source.top, source.right, source.bottom },
+         { destination.left, destination.top, destination.right, destination.bottom },
+diff --git a/src/startup_renderer_blit_surface.cpp b/src/startup_renderer_blit_surface.cpp
+--- a/src/startup_renderer_blit_surface.cpp
++++ b/src/startup_renderer_blit_surface.cpp
+@@ -2,6 +2,7 @@
+ #include "runtime/renderer_fullscreen_display.h"
+ #include "runtime/renderer_word_surface.h"
+ #include <stdexcept>
++#include <cstdio>
+ 
+ // FUNCTION: BEACHLIFE 0x0040e650
+ void ScreenRequestRenderer::BlitSurface(int x, int y, int surface)
+@@ -50,6 +51,21 @@
+         throw std::logic_error("BlitSurface requires the real mode0 back and source surfaces");
+ 
+     const auto description = source->native_surface->description();
++    const beachlife::runtime::renderer_display::Rectangle whole{ 0, 0, description.width, description.height };
++    const beachlife::runtime::renderer_display::Rectangle placed{ x, y, static_cast<int>(x + source->width), static_cast<int>(y + source->height) };
++    // DirectDraw drew nothing for a rectangle outside the surface; the game ignored the error.
++    if (source->video_memory ? !native_back->copy_fits(*source->native_surface, whole, x, y)
++                             : !native_back->blit_fits(*source->native_surface, whole, placed))
++    {
++        static bool reported = false;
++        if (!reported)
++        {
++            reported = true;
++            std::fprintf(stderr, "Skipped BlitSurface: %d x %d at %d %d surface %d\n",
++                description.width, description.height, x, y, surface);
++        }
++        return;
++    }
+     if (source->video_memory)
+         native_back->copy_from(*source->native_surface,
+             { 0, 0, description.width, description.height },
+diff --git a/src/startup_renderer_surface_helpers.cpp b/src/startup_renderer_surface_helpers.cpp
+--- a/src/startup_renderer_surface_helpers.cpp
++++ b/src/startup_renderer_surface_helpers.cpp
+@@ -2,6 +2,7 @@
+ #include "runtime/renderer_word_surface.h"
+ 
+ #include <stdexcept>
++#include <cstdio>
+ 
+ // FUNCTION: BEACHLIFE 0x00411b50
+ unsigned char ScreenRequestRenderer::SupportsWidth(int requested_width)
+@@ -69,6 +70,21 @@
+     if (!target->native_surface || !image->native_surface)
+         throw std::logic_error("BlitBetweenSurfaces requires real source and destination surfaces");
+     const auto description = image->native_surface->description();
++    const beachlife::runtime::renderer_display::Rectangle whole{ 0, 0, description.width, description.height };
++    const beachlife::runtime::renderer_display::Rectangle placed{ x, y, static_cast<int>(x + image->width), static_cast<int>(y + image->height) };
++    // DirectDraw drew nothing for a rectangle outside the surface; the game ignored the error.
++    if (image->video_memory ? !target->native_surface->copy_fits(*image->native_surface, whole, x, y)
++                            : !target->native_surface->blit_fits(*image->native_surface, whole, placed))
++    {
++        static bool reported = false;
++        if (!reported)
++        {
++            reported = true;
++            std::fprintf(stderr, "Skipped BlitBetweenSurfaces: %d x %d at %d %d from %d to %d\n",
++                description.width, description.height, x, y, source, destination);
++        }
++        return;
++    }
+     if (image->video_memory)
+         target->native_surface->copy_from(*image->native_surface,
+             { 0, 0, description.width, description.height },
